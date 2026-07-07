@@ -1,0 +1,62 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Photo upload backend: an S3 bucket and a Lambda (behind API Gateway HTTP API)
+  that issues presigned PUT URLs so the iOS app never holds AWS credentials.
+
+Parameters:
+  ApiKey:
+    Type: String
+    NoEcho: true
+    MinLength: 16
+    Description: >
+      Shared secret the iOS app must send in the "x-api-key" header.
+      Generate one with e.g. "openssl rand -hex 32".
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 10
+    MemorySize: 128
+
+Resources:
+  PhotoBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  PresignFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/presign/
+      Handler: app.handler
+      Description: Issues presigned S3 PUT URLs for photo uploads.
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref PhotoBucket
+          API_KEY: !Ref ApiKey
+      Policies:
+        - S3WritePolicy:
+            BucketName: !Ref PhotoBucket
+      Events:
+        Presign:
+          Type: HttpApi
+          Properties:
+            Path: /presign
+            Method: POST
+
+Outputs:
+  ApiEndpoint:
+    Description: Base URL for the API. The iOS app POSTs to <ApiEndpoint>/presign.
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+  BucketName:
+    Description: Bucket that receives the uploaded photos.
+    Value: !Ref PhotoBucket
