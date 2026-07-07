@@ -124,7 +124,30 @@ aws s3 ls s3://<BucketName>/uploads/ --recursive
 
 ## CI
 
-GitHub Actions で push / PR ごとに以下を実行します:
+GitHub Actions で push / PR ごとに以下の 3 ジョブを実行します:
 
-- `cfn-lint` による SAM テンプレートの検証と Lambda ソースのコンパイルチェック
-- macOS ランナーで XcodeGen → `xcodebuild` による iOS アプリのビルド確認
+| ジョブ | 内容 | 成果物(Artifacts) |
+|---|---|---|
+| `backend-lint` | `cfn-lint` による SAM テンプレート検証 + Lambda のコンパイルチェック | — |
+| `ios-simulator-test` | iOS シミュレータでアプリを起動して UI テストを実行 | `simulator-screenshots`(実行中の画面キャプチャ) |
+| `ios-unsigned-ipa` | 実機向け未署名ビルドをパッケージ | `PhotoUploader-unsigned-ipa`(サイドロード用 .ipa) |
+
+成果物は GitHub の **Actions → 該当の実行 → 画面下部の Artifacts** からダウンロードできます。
+
+## Mac がなくても試す方法
+
+### 画面の確認(スクリーンショット)
+
+push するたびに CI がシミュレータ上でアプリを実際に起動し、スクリーンショットを撮ります。`simulator-screenshots` Artifact を開くと、空状態の画面と写真ピッカーを開いた画面が確認できます。
+
+### 実機での利用(AltStore / Windows)
+
+Apple Developer Program に加入していなくても、Windows パソコンがあれば [AltStore](https://altstore.io/) で自分の iPhone にインストールできます:
+
+1. **事前準備(重要):** `ios/PhotoUploader/AppConfig.swift` にデプロイ済みバックエンドの `ApiEndpoint` と API キーを設定してコミットしておく(CI がビルドする .ipa にその値が焼き込まれます。このリポジトリはプライベート前提です)
+2. Windows に [AltServer](https://altstore.io/) をインストール(iTunes / iCloud の**非 Microsoft Store 版**が必要)
+3. iPhone を USB 接続し、AltServer から AltStore を iPhone にインストール
+4. CI の `PhotoUploader-unsigned-ipa` Artifact をダウンロード・解凍し、.ipa を iPhone に転送(またはブラウザでダウンロード)
+5. iPhone の AltStore アプリで「+」→ .ipa を選択 → 無料の Apple ID で署名されてインストール完了
+
+**制限事項(無料 Apple ID の場合):** 署名の有効期限が 7 日間のため、週 1 回 AltStore での更新(Refresh)が必要です。同時にサイドロードできるアプリは 3 つまで。常用するなら Apple Developer Program($99/年)+ TestFlight 配信への移行がおすすめです。

@@ -6,6 +6,9 @@ ios/PhotoUploader.xcodeproj/
 ios/PhotoUploader/Info.plist
 xcuserdata/
 DerivedData/
+*.xcresult
+Payload/
+*.ipa
 
 # AWS SAM
 backend/.aws-sam/

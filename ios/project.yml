@@ -26,10 +26,27 @@ targets:
           - UIInterfaceOrientationPortrait
         ITSAppUsesNonExemptEncryption: false
 
+  PhotoUploaderUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - PhotoUploaderUITests
+    dependencies:
+      - target: PhotoUploader
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: PhotoUploader
+
 schemes:
   PhotoUploader:
     build:
       targets:
         PhotoUploader: all
+        PhotoUploaderUITests: [test]
     run:
       config: Debug
+    test:
+      config: Debug
+      targets:
+        - PhotoUploaderUITests
