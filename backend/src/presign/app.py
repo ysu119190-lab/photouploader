@@ -1,9 +1,12 @@
 """Lambda handler that issues presigned S3 PUT URLs for photo uploads.
 
-The iOS app POSTs {"contentType": "image/jpeg"} with an "x-api-key" header,
-and receives {"uploadUrl": ..., "key": ..., "expiresIn": ...}. It then PUTs
-the photo bytes directly to S3 using that URL, so the app never needs AWS
-credentials and the photo bytes never pass through Lambda.
+The API Gateway JWT authorizer (Cognito) has already validated the caller's
+ID token before this handler runs; the verified claims arrive in the request
+context. The iOS app POSTs {"contentType": "image/jpeg"} and receives
+{"uploadUrl": ..., "key": ..., "expiresIn": ...}. It then PUTs the photo
+bytes directly to S3 using that URL, so the app never needs AWS credentials
+and the photo bytes never pass through Lambda. Each user's photos are stored
+under their own uploads/<user id>/ prefix.
 """
 
 import datetime
@@ -17,7 +20,6 @@ from botocore.config import Config
 s3 = boto3.client("s3", config=Config(signature_version="s3v4"))
 
 BUCKET_NAME = os.environ["BUCKET_NAME"]
-API_KEY = os.environ.get("API_KEY", "")
 # Background uploads may sit in the OS queue for a while before they run,
 # so give the URL a generous lifetime. The app retries with a fresh URL on
 # 403 in case it still expires (URLs signed with Lambda's temporary
@@ -36,9 +38,15 @@ ALLOWED_CONTENT_TYPES = {
 
 
 def handler(event, _context):
-    headers = {k.lower(): v for k, v in (event.get("headers") or {}).items()}
-    if not API_KEY or headers.get("x-api-key") != API_KEY:
-        return _response(403, {"message": "Forbidden"})
+    claims = (
+        event.get("requestContext", {})
+        .get("authorizer", {})
+        .get("jwt", {})
+        .get("claims", {})
+    )
+    user_id = claims.get("sub")
+    if not user_id:
+        return _response(401, {"message": "Unauthorized"})
 
     try:
         body = json.loads(event.get("body") or "{}")
@@ -57,7 +65,7 @@ def handler(event, _context):
         )
 
     now = datetime.datetime.now(datetime.timezone.utc)
-    key = f"uploads/{now:%Y/%m/%d}/{uuid.uuid4()}{extension}"
+    key = f"uploads/{user_id}/{now:%Y/%m/%d}/{uuid.uuid4()}{extension}"
 
     upload_url = s3.generate_presigned_url(
         "put_object",

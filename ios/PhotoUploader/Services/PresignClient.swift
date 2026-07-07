@@ -23,13 +23,16 @@ enum UploadError: LocalizedError {
     }
 }
 
-/// Requests presigned S3 PUT URLs from the backend.
+/// Requests presigned S3 PUT URLs from the backend, authenticating with the
+/// signed-in user's Cognito ID token (auto-refreshed by TokenProvider).
 enum PresignClient {
     static func requestPresignedURL(contentType: String) async throws -> PresignResponse {
+        let idToken = try await TokenProvider.shared.validIdToken()
+
         var request = URLRequest(url: AppConfig.apiBaseURL.appendingPathComponent("presign"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(AppConfig.apiKey, forHTTPHeaderField: "x-api-key")
+        request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONEncoder().encode(["contentType": contentType])
 
         let (data, response) = try await URLSession.shared.data(for: request)

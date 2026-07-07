@@ -2,10 +2,27 @@ import PhotosUI
 import SwiftUI
 
 struct ContentView: View {
+    @StateObject private var session = SessionStore()
     @StateObject private var viewModel = UploadViewModel()
     @State private var selection: [PhotosPickerItem] = []
 
     var body: some View {
+        Group {
+            switch session.state {
+            case .loading:
+                ProgressView()
+            case .signedOut, .needsConfirmation:
+                AuthView(session: session)
+            case .signedIn:
+                uploadView
+            }
+        }
+        .task {
+            await session.bootstrap()
+        }
+    }
+
+    private var uploadView: some View {
         NavigationStack {
             List(viewModel.items) { item in
                 UploadRow(item: item)
@@ -21,7 +38,12 @@ struct ContentView: View {
             }
             .navigationTitle("Photo Uploader")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItemGroup(placement: .topBarLeading) {
+                    Button("ログアウト") {
+                        Task { await session.signOut() }
+                    }
+                    .disabled(viewModel.isUploading)
+
                     Button("完了分を消す") {
                         viewModel.clearFinished()
                     }

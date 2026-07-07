@@ -1,17 +1,9 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  Photo upload backend: an S3 bucket and a Lambda (behind API Gateway HTTP API)
-  that issues presigned PUT URLs so the iOS app never holds AWS credentials.
-
-Parameters:
-  ApiKey:
-    Type: String
-    NoEcho: true
-    MinLength: 16
-    Description: >
-      Shared secret the iOS app must send in the "x-api-key" header.
-      Generate one with e.g. "openssl rand -hex 32".
+  Photo upload backend: a Cognito user pool for sign-up/sign-in, an S3 bucket,
+  and a Lambda (behind a JWT-protected API Gateway HTTP API) that issues
+  presigned PUT URLs so the iOS app never holds AWS credentials.
 
 Globals:
   Function:
@@ -33,6 +25,44 @@ Resources:
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
 
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: false
+          RequireLowercase: false
+          RequireNumbers: false
+          RequireSymbols: false
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+
+  Api:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Auth:
+        DefaultAuthorizer: CognitoJwtAuthorizer
+        Authorizers:
+          CognitoJwtAuthorizer:
+            JwtConfiguration:
+              issuer: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}"
+              audience:
+                - !Ref UserPoolClient
+            IdentitySource: "$request.header.Authorization"
+
   PresignFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -42,7 +72,6 @@ Resources:
       Environment:
         Variables:
           BUCKET_NAME: !Ref PhotoBucket
-          API_KEY: !Ref ApiKey
       Policies:
         - S3WritePolicy:
             BucketName: !Ref PhotoBucket
@@ -50,13 +79,23 @@ Resources:
         Presign:
           Type: HttpApi
           Properties:
+            ApiId: !Ref Api
             Path: /presign
             Method: POST
 
 Outputs:
   ApiEndpoint:
     Description: Base URL for the API. The iOS app POSTs to <ApiEndpoint>/presign.
-    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+    Value: !Sub "https://${Api}.execute-api.${AWS::Region}.amazonaws.com"
+  UserPoolId:
+    Description: Cognito user pool ID.
+    Value: !Ref UserPool
+  UserPoolClientId:
+    Description: Cognito app client ID the iOS app authenticates against.
+    Value: !Ref UserPoolClient
+  Region:
+    Description: Region the stack is deployed in (needed by the iOS app config).
+    Value: !Ref AWS::Region
   BucketName:
     Description: Bucket that receives the uploaded photos.
     Value: !Ref PhotoBucket

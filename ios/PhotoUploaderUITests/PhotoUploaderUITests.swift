@@ -8,23 +8,30 @@ final class PhotoUploaderUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    func testMainScreenShowsEmptyStateAndPicker() throws {
+    func testLaunchShowsSignInScreen() throws {
         let app = XCUIApplication()
         app.launch()
 
+        // A fresh simulator has no stored session, so the auth screen appears.
         XCTAssertTrue(
-            app.navigationBars["Photo Uploader"].waitForExistence(timeout: 10),
-            "ナビゲーションバーが表示されること"
+            app.textFields["メールアドレス"].waitForExistence(timeout: 10),
+            "メールアドレス入力欄が表示されること"
         )
-        XCTAssertTrue(app.buttons["写真を選択"].exists, "写真選択ボタンが表示されること")
-        XCTAssertTrue(app.staticTexts["写真がありません"].exists, "空状態の案内が表示されること")
+        XCTAssertTrue(
+            app.secureTextFields["パスワード(8文字以上)"].exists,
+            "パスワード入力欄が表示されること"
+        )
+        XCTAssertTrue(app.buttons["ログインする"].exists, "ログインボタンが表示されること")
 
-        attachScreenshot(named: "01-empty-state")
+        attachScreenshot(named: "01-sign-in")
 
-        // Open the photo picker (an out-of-process sheet) and capture it.
-        app.buttons["写真を選択"].tap()
-        sleep(3)
-        attachScreenshot(named: "02-photo-picker")
+        // Switch the segmented control to sign-up mode and capture it too.
+        let signUpSegment = app.segmentedControls.buttons["新規登録"]
+        if signUpSegment.waitForExistence(timeout: 5) {
+            signUpSegment.tap()
+            XCTAssertTrue(app.buttons["登録する"].waitForExistence(timeout: 5))
+            attachScreenshot(named: "02-sign-up")
+        }
     }
 
     private func attachScreenshot(named name: String) {
