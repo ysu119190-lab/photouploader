@@ -54,6 +54,8 @@ struct AuthView: View {
                 }
             }
             .pickerStyle(.segmented)
+        } footer: {
+            Text("このアプリ専用のアカウントです(AWSのアカウントやApple IDとは関係ありません)。初めて使うときは「新規登録」でメールアドレスとパスワードを登録してください。")
         }
 
         Section {
@@ -94,7 +96,12 @@ struct AuthView: View {
             }
             .font(.footnote)
         } footer: {
-            Text("別のAWS環境に接続する場合はこちら")
+            VStack(alignment: .leading, spacing: 4) {
+                if let host = BackendConfigStore.load()?.apiBaseURL.host() {
+                    Text("現在の接続先: \(host)")
+                }
+                Text("接続設定は端末に保存済みなので、再入力は不要です。別のAWS環境につなぎ替えるときだけやり直してください。")
+            }
         }
     }
 

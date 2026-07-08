@@ -48,15 +48,34 @@ struct ContentView: View {
                     } header: {
                         UploadSummaryHeader(
                             done: viewModel.doneCount,
+                            skipped: viewModel.skippedCount,
                             failed: viewModel.failedCount,
                             total: viewModel.items.count,
                             isUploading: viewModel.isUploading
                         )
                     }
                 }
+
+                if !viewModel.history.isEmpty {
+                    Section {
+                        ForEach(viewModel.history) { batch in
+                            HistoryRow(batch: batch)
+                        }
+                    } header: {
+                        HStack {
+                            Text("これまでのアップロード")
+                            Spacer()
+                            Button("履歴を消去") {
+                                viewModel.clearHistory()
+                            }
+                            .font(.caption)
+                        }
+                        .textCase(nil)
+                    }
+                }
             }
             .overlay {
-                if viewModel.items.isEmpty {
+                if viewModel.items.isEmpty && viewModel.history.isEmpty {
                     ContentUnavailableView(
                         "写真がありません",
                         systemImage: "photo.on.rectangle.angled",
@@ -66,22 +85,18 @@ struct ContentView: View {
             }
             .navigationTitle("Photo Uploader")
             .toolbar {
-                ToolbarItemGroup(placement: .topBarLeading) {
+                ToolbarItem(placement: .topBarLeading) {
                     Button("ログアウト") {
                         Task { await session.signOut() }
                     }
                     .disabled(viewModel.isUploading)
-
-                    Button("完了分を消す") {
-                        viewModel.clearFinished()
-                    }
-                    .disabled(viewModel.items.isEmpty)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     PhotosPicker(
                         selection: $selection,
                         maxSelectionCount: nil,
-                        matching: .images
+                        matching: .images,
+                        photoLibrary: .shared()
                     ) {
                         Label("写真を選択", systemImage: "photo.badge.plus")
                     }
@@ -107,6 +122,7 @@ struct ContentView: View {
 /// Batch progress bar shown above the upload list.
 private struct UploadSummaryHeader: View {
     let done: Int
+    let skipped: Int
     let failed: Int
     let total: Int
     let isUploading: Bool
@@ -118,18 +134,52 @@ private struct UploadSummaryHeader: View {
                     ProgressView()
                         .controlSize(.small)
                 }
-                Text(isUploading ? "アップロード中" : "アップロード結果")
+                Text(isUploading ? "アップロード中" : "今回のアップロード")
                     .font(.subheadline.weight(.semibold))
                 Spacer()
-                Text("完了 \(done)/\(total)\(failed > 0 ? "・失敗 \(failed)" : "")")
+                Text(summaryText)
                     .font(.caption)
                     .monospacedDigit()
             }
-            ProgressView(value: Double(done + failed), total: Double(max(total, 1)))
+            ProgressView(value: Double(done + skipped + failed), total: Double(max(total, 1)))
                 .tint(failed > 0 ? .orange : .accentColor)
         }
         .padding(.vertical, 6)
         .textCase(nil)
+    }
+
+    private var summaryText: String {
+        var text = "完了 \(done)/\(total)"
+        if skipped > 0 { text += "・スキップ \(skipped)" }
+        if failed > 0 { text += "・失敗 \(failed)" }
+        return text
+    }
+}
+
+/// One row per past upload operation.
+private struct HistoryRow: View {
+    let batch: UploadBatchSummary
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: batch.failed > 0 ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                .foregroundStyle(batch.failed > 0 ? Color.orange : Color.green)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(batch.date, format: .dateTime.year().month().day().hour().minute())
+                    .font(.subheadline)
+                Text(summaryText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private var summaryText: String {
+        var parts = ["\(batch.total)枚中\(batch.done)枚アップロード"]
+        if batch.skipped > 0 { parts.append("スキップ\(batch.skipped)") }
+        if batch.failed > 0 { parts.append("失敗\(batch.failed)") }
+        return parts.joined(separator: "・")
     }
 }
 
@@ -181,6 +231,10 @@ private struct UploadRow: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
+        case .skipped:
+            Text("アップロード済みのためスキップ")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         case .failed(let message):
             Text(message)
                 .font(.caption)
@@ -199,6 +253,9 @@ private struct UploadRow: View {
         case .done:
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.green)
+        case .skipped:
+            Image(systemName: "minus.circle.fill")
+                .foregroundStyle(.secondary)
         case .failed:
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.red)

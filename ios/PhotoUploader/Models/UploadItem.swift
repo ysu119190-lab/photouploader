@@ -6,6 +6,8 @@ struct UploadItem: Identifiable {
         case pending
         case uploading(progress: Double)
         case done(key: String)
+        /// Already uploaded in a previous batch — not sent again.
+        case skipped
         case failed(message: String)
     }
 

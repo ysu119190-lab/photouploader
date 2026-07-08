@@ -5,11 +5,18 @@ import UniformTypeIdentifiers
 
 @MainActor
 final class UploadViewModel: ObservableObject {
+    /// Photos in the current (or most recent) batch.
     @Published private(set) var items: [UploadItem] = []
     @Published private(set) var isUploading = false
+    /// Finished batches, newest first, persisted across launches.
+    @Published private(set) var history: [UploadBatchSummary] = UploadHistoryStore.load()
 
     var doneCount: Int {
         items.filter { if case .done = $0.status { return true } else { return false } }.count
+    }
+
+    var skippedCount: Int {
+        items.filter { if case .skipped = $0.status { return true } else { return false } }.count
     }
 
     var failedCount: Int {
@@ -25,13 +32,16 @@ final class UploadViewModel: ObservableObject {
         "image/jpeg", "image/png", "image/heic", "image/heif", "image/webp", "image/gif",
     ]
 
-    /// Uploads the picked photos, at most `maxConcurrentUploads` at a time.
-    /// Once a photo is handed to the background session, its transfer survives
-    /// backgrounding; this method only needs the app alive while photos are
-    /// being read from the photo library and prepared.
+    /// Uploads the picked photos as one batch, at most `maxConcurrentUploads`
+    /// at a time. Once a photo is handed to the background session, its
+    /// transfer survives backgrounding; this method only needs the app alive
+    /// while photos are being read from the photo library and prepared.
     func handleSelection(_ pickerItems: [PhotosPickerItem]) async {
         guard !pickerItems.isEmpty, !isUploading else { return }
         isUploading = true
+        items = []
+        let startedAt = Date()
+
         // Keep the screen awake while the batch runs so the user can watch
         // progress; transfers themselves survive lock/background regardless.
         UIApplication.shared.isIdleTimerDisabled = true
@@ -50,6 +60,17 @@ final class UploadViewModel: ObservableObject {
             if backgroundTask != .invalid {
                 UIApplication.shared.endBackgroundTask(backgroundTask)
             }
+            UploadHistoryStore.append(
+                UploadBatchSummary(
+                    id: UUID(),
+                    date: startedAt,
+                    total: items.count,
+                    done: doneCount,
+                    skipped: skippedCount,
+                    failed: failedCount
+                )
+            )
+            history = UploadHistoryStore.load()
         }
 
         var queue: [(pickerItem: PhotosPickerItem, itemID: UUID)] = []
@@ -72,14 +93,18 @@ final class UploadViewModel: ObservableObject {
         }
     }
 
-    func clearFinished() {
-        items.removeAll { item in
-            if case .done = item.status { return true }
-            return false
-        }
+    func clearHistory() {
+        UploadHistoryStore.clear()
+        history = []
     }
 
     private func upload(_ pickerItem: PhotosPickerItem, itemID: UUID) async {
+        // Photos already uploaded in a previous batch are skipped, not resent.
+        if let assetID = pickerItem.itemIdentifier, UploadedAssetsStore.contains(assetID) {
+            update(itemID) { $0.status = .skipped }
+            return
+        }
+
         do {
             guard let rawData = try await pickerItem.loadTransferable(type: Data.self) else {
                 update(itemID) { $0.status = .failed(message: "写真を読み込めませんでした") }
@@ -116,6 +141,9 @@ final class UploadViewModel: ObservableObject {
             }
 
             update(itemID) { $0.status = .done(key: key) }
+            if let assetID = pickerItem.itemIdentifier {
+                UploadedAssetsStore.insert(assetID)
+            }
         } catch {
             update(itemID) { $0.status = .failed(message: error.localizedDescription) }
         }
