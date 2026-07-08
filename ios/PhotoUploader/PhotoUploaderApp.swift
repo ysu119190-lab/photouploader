@@ -1,8 +1,17 @@
+import GoogleMobileAds
 import SwiftUI
 
 /// Receives the callback iOS sends when it relaunches (or wakes) the app
 /// because background uploads finished.
 final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+    ) -> Bool {
+        GADMobileAds.sharedInstance().start(completionHandler: nil)
+        return true
+    }
+
     func application(
         _ application: UIApplication,
         handleEventsForBackgroundURLSession identifier: String,

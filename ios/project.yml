@@ -11,12 +11,20 @@ settings:
     TARGETED_DEVICE_FAMILY: "1"
     CODE_SIGN_STYLE: Automatic
 
+packages:
+  GoogleMobileAds:
+    url: https://github.com/googleads/swift-package-manager-google-mobile-ads
+    from: "11.2.0"
+
 targets:
   PhotoUploader:
     type: application
     platform: iOS
     sources:
       - PhotoUploader
+    dependencies:
+      - package: GoogleMobileAds
+        product: GoogleMobileAds
     settings:
       base:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -29,6 +37,11 @@ targets:
           - UIInterfaceOrientationPortrait
         ITSAppUsesNonExemptEncryption: false
         NSCameraUsageDescription: 設定用QRコードの読み取りにカメラを使用します
+        # AdMob: Google's official TEST application ID. Replace with your own
+        # AdMob app ID before releasing to the App Store (see README).
+        GADApplicationIdentifier: ca-app-pub-3940256099942544~1458002511
+        SKAdNetworkItems:
+          - SKAdNetworkIdentifier: cstr6suwn9.skadnetwork
 
   PhotoUploaderUITests:
     type: bundle.ui-testing

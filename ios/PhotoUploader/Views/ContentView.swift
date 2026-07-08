@@ -94,6 +94,12 @@ struct ContentView: View {
                 selection = []
                 Task { await viewModel.handleSelection(picked) }
             }
+            .safeAreaInset(edge: .bottom) {
+                BannerAdView()
+                    .frame(width: 320, height: 50)
+                    .frame(maxWidth: .infinity)
+                    .background(.bar)
+            }
         }
     }
 }

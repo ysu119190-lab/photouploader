@@ -146,6 +146,20 @@ curl -X POST "<ApiEndpoint>/presign" \
 
 > パスワード認証には `USER_PASSWORD_AUTH` フロー(TLS 経由でパスワード送信)を使っています。SRP 化や Sign in with Apple 対応は今後の拡張候補です。
 
+## 広告(AdMob)
+
+メイン画面の下部に AdMob のバナー広告を表示します。現在は **Google 公式のテスト用 ID** が設定されており、サンプル広告が表示されるだけで収益は発生しません(テスト ID のまま本番配信するのは AdMob 規約違反なので注意)。
+
+**本番化の手順(App Store 公開時):**
+
+1. [AdMob](https://admob.google.com/) アカウントを作成し、アプリを登録
+2. 発行された**アプリ ID** を `ios/project.yml` の `GADApplicationIdentifier` に設定
+3. バナー広告ユニットを作成し、その **広告ユニット ID** を `ios/PhotoUploader/Services/AdsConfig.swift` の `bannerAdUnitID` に設定
+4. `SKAdNetworkItems` に [Google 推奨の SKAdNetwork ID 一覧](https://developers.google.com/admob/ios/quick-start#update_your_infoplist)を追加
+5. 広告のパーソナライズを行う場合は ATT(App Tracking Transparency)対応と `NSUserTrackingUsageDescription` の追加を検討
+
+なお、AdMob の収益化は実質的に App Store で公開されたアプリが前提です(AltStore 等のサイドロード配布では審査・収益化ができません)。
+
 ## 今後の拡張アイデア
 
 - カメラ撮影からの直接アップロード
