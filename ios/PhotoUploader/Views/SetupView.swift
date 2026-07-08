@@ -22,7 +22,18 @@ struct SetupView: View {
                 .listRowBackground(Color.clear)
 
                 Section {
-                    Text("バックアップ先となる、あなたのAWS環境の情報を設定します。バックエンドのデプロイ完了時に表示される値を使ってください(README参照)。")
+                    NavigationLink {
+                        SetupGuideView()
+                    } label: {
+                        Label("はじめての方はこちら(設定ガイド)", systemImage: "questionmark.circle")
+                            .font(.body.weight(.semibold))
+                    }
+                } footer: {
+                    Text("AWSアカウントの作成から保存先の準備まで、順を追って案内します")
+                }
+
+                Section {
+                    Text("すでに保存先を用意済みの方は、以下のいずれかで接続設定を入力してください。")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }

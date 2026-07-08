@@ -20,6 +20,14 @@ final class PhotoUploaderUITests: XCTestCase {
             "接続先設定画面が表示されること"
         )
         attachScreenshot(named: "01-setup")
+
+        // Open the first-time guide and capture it too.
+        let guideLink = app.buttons["はじめての方はこちら(設定ガイド)"]
+        if guideLink.waitForExistence(timeout: 5) {
+            guideLink.tap()
+            sleep(1)
+            attachScreenshot(named: "01b-guide")
+        }
         app.terminate()
 
         // Relaunch with a preset backend config (typing into the simulator is
