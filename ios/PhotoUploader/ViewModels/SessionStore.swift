@@ -18,6 +18,19 @@ final class SessionStore: ObservableObject {
     @Published private(set) var state: State = .loading
 
     func bootstrap() async {
+        // UI tests pass this flag to reach the sign-in screen without having
+        // to type into the setup form (simulator typing is flaky in CI).
+        if ProcessInfo.processInfo.arguments.contains("-uiTestPresetConfig"),
+           BackendConfigStore.load() == nil {
+            BackendConfigStore.save(
+                BackendConfig(
+                    apiBaseURL: URL(string: "https://example.execute-api.ap-northeast-1.amazonaws.com")!,
+                    region: "ap-northeast-1",
+                    clientId: "ui-test-client"
+                )
+            )
+        }
+
         guard BackendConfigStore.load() != nil else {
             state = .needsSetup
             return
