@@ -1,4 +1,4 @@
-# デプロイ済みバックエンドの接続設定を表示し、QRコード付きHTMLを生成します。
+﻿# デプロイ済みバックエンドの接続設定を表示し、QRコード付きHTMLを生成します。
 # 使い方 (PowerShell):  .\show-config.ps1 [スタック名]
 #   スタック名を省略すると photo-uploader を使います。
 param([string]$StackName = "photo-uploader")
