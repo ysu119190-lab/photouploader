@@ -6,6 +6,8 @@ import SwiftUI
 final class SessionStore: ObservableObject {
     enum State {
         case loading
+        /// No backend configured yet — show the setup screen first.
+        case needsSetup
         case signedOut
         /// Waiting for the email confirmation code. The password is kept so
         /// the app can sign in automatically right after confirmation.
@@ -16,7 +18,26 @@ final class SessionStore: ObservableObject {
     @Published private(set) var state: State = .loading
 
     func bootstrap() async {
+        guard BackendConfigStore.load() != nil else {
+            state = .needsSetup
+            return
+        }
         state = await TokenProvider.shared.isSignedIn() ? .signedIn : .signedOut
+    }
+
+    /// Saves the backend configuration entered in the setup screen and moves
+    /// on to the sign-in screen.
+    func applyConfig(_ config: BackendConfig) {
+        BackendConfigStore.save(config)
+        state = .signedOut
+    }
+
+    /// Clears the stored backend configuration (and any session) so the user
+    /// can connect to a different AWS environment.
+    func resetBackend() async {
+        await TokenProvider.shared.signOut()
+        BackendConfigStore.clear()
+        state = .needsSetup
     }
 
     func signIn(email: String, password: String) async throws {

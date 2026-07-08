@@ -11,6 +11,8 @@ struct ContentView: View {
             switch session.state {
             case .loading:
                 ProgressView()
+            case .needsSetup:
+                SetupView(session: session)
             case .signedOut, .needsConfirmation:
                 AuthView(session: session)
             case .signedIn:

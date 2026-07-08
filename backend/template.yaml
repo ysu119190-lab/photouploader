@@ -84,6 +84,11 @@ Resources:
             Method: POST
 
 Outputs:
+  AppConfigJson:
+    Description: >
+      Paste this whole value into the app's setup screen (or turn it into a
+      QR code and scan it with the app).
+    Value: !Sub '{"apiEndpoint":"https://${Api}.execute-api.${AWS::Region}.amazonaws.com","region":"${AWS::Region}","clientId":"${UserPoolClient}"}'
   ApiEndpoint:
     Description: Base URL for the API. The iOS app POSTs to <ApiEndpoint>/presign.
     Value: !Sub "https://${Api}.execute-api.${AWS::Region}.amazonaws.com"

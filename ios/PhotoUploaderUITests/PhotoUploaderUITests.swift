@@ -8,29 +8,43 @@ final class PhotoUploaderUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    func testLaunchShowsSignInScreen() throws {
+    func testSetupThenAuthScreens() throws {
         let app = XCUIApplication()
         app.launch()
 
-        // A fresh simulator has no stored session, so the auth screen appears.
+        // A fresh install has no backend configured, so setup comes first.
+        let apiField = app.textFields["APIのURL"]
+        XCTAssertTrue(apiField.waitForExistence(timeout: 10), "接続先設定画面が表示されること")
+        attachScreenshot(named: "01-setup")
+
+        apiField.tap()
+        apiField.typeText("https://example.execute-api.ap-northeast-1.amazonaws.com")
+
+        let clientField = app.textFields["クライアントID"]
+        clientField.tap()
+        clientField.typeText("dummy-client-id")
+
+        let saveButton = app.buttons["この内容で設定する"]
+        if !saveButton.isHittable {
+            app.swipeUp()
+        }
+        XCTAssertTrue(saveButton.waitForExistence(timeout: 5))
+        saveButton.tap()
+
+        // Sign-in screen appears once the backend is configured.
         XCTAssertTrue(
             app.textFields["メールアドレス"].waitForExistence(timeout: 10),
-            "メールアドレス入力欄が表示されること"
+            "ログイン画面が表示されること"
         )
-        XCTAssertTrue(
-            app.secureTextFields["パスワード(8文字以上)"].exists,
-            "パスワード入力欄が表示されること"
-        )
-        XCTAssertTrue(app.buttons["ログインする"].exists, "ログインボタンが表示されること")
-
-        attachScreenshot(named: "01-sign-in")
+        XCTAssertTrue(app.secureTextFields["パスワード(8文字以上)"].exists)
+        attachScreenshot(named: "02-sign-in")
 
         // Switch the segmented control to sign-up mode and capture it too.
         let signUpSegment = app.segmentedControls.buttons["新規登録"]
         if signUpSegment.waitForExistence(timeout: 5) {
             signUpSegment.tap()
             XCTAssertTrue(app.buttons["登録する"].waitForExistence(timeout: 5))
-            attachScreenshot(named: "02-sign-up")
+            attachScreenshot(named: "03-sign-up")
         }
     }
 

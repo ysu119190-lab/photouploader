@@ -25,6 +25,7 @@ targets:
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         ITSAppUsesNonExemptEncryption: false
+        NSCameraUsageDescription: 設定用QRコードの読み取りにカメラを使用します
 
   PhotoUploaderUITests:
     type: bundle.ui-testing

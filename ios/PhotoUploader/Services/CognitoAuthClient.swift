@@ -7,11 +7,14 @@ struct AuthTokens {
 }
 
 enum AuthError: LocalizedError {
+    case notConfigured
     case notSignedIn
     case unexpectedResponse
 
     var errorDescription: String? {
         switch self {
+        case .notConfigured:
+            return "接続先が設定されていません"
         case .notSignedIn:
             return "ログインが必要です"
         case .unexpectedResponse:
@@ -53,15 +56,13 @@ struct CognitoError: LocalizedError {
 /// These are public, unauthenticated Cognito operations — no AWS credentials
 /// or SDK needed, just the app client ID.
 enum CognitoAuthClient {
-    private static var endpointURL: URL {
-        URL(string: "https://cognito-idp.\(AppConfig.cognitoRegion).amazonaws.com/")!
-    }
-
     static func signUp(email: String, password: String) async throws {
+        let config = try BackendConfigStore.required()
         _ = try await call(
             target: "SignUp",
+            region: config.region,
             payload: [
-                "ClientId": AppConfig.cognitoClientId,
+                "ClientId": config.clientId,
                 "Username": email,
                 "Password": password,
                 "UserAttributes": [["Name": "email", "Value": email]],
@@ -70,10 +71,12 @@ enum CognitoAuthClient {
     }
 
     static func confirmSignUp(email: String, code: String) async throws {
+        let config = try BackendConfigStore.required()
         _ = try await call(
             target: "ConfirmSignUp",
+            region: config.region,
             payload: [
-                "ClientId": AppConfig.cognitoClientId,
+                "ClientId": config.clientId,
                 "Username": email,
                 "ConfirmationCode": code,
             ]
@@ -81,11 +84,13 @@ enum CognitoAuthClient {
     }
 
     static func signIn(email: String, password: String) async throws -> AuthTokens {
+        let config = try BackendConfigStore.required()
         let result = try await call(
             target: "InitiateAuth",
+            region: config.region,
             payload: [
                 "AuthFlow": "USER_PASSWORD_AUTH",
-                "ClientId": AppConfig.cognitoClientId,
+                "ClientId": config.clientId,
                 "AuthParameters": ["USERNAME": email, "PASSWORD": password],
             ]
         )
@@ -93,11 +98,13 @@ enum CognitoAuthClient {
     }
 
     static func refresh(refreshToken: String) async throws -> AuthTokens {
+        let config = try BackendConfigStore.required()
         let result = try await call(
             target: "InitiateAuth",
+            region: config.region,
             payload: [
                 "AuthFlow": "REFRESH_TOKEN_AUTH",
-                "ClientId": AppConfig.cognitoClientId,
+                "ClientId": config.clientId,
                 "AuthParameters": ["REFRESH_TOKEN": refreshToken],
             ]
         )
@@ -119,7 +126,14 @@ enum CognitoAuthClient {
         return AuthTokens(idToken: idToken, refreshToken: refreshToken, expiresIn: expiresIn)
     }
 
-    private static func call(target: String, payload: [String: Any]) async throws -> [String: Any] {
+    private static func call(
+        target: String,
+        region: String,
+        payload: [String: Any]
+    ) async throws -> [String: Any] {
+        guard let endpointURL = URL(string: "https://cognito-idp.\(region).amazonaws.com/") else {
+            throw AuthError.notConfigured
+        }
         var request = URLRequest(url: endpointURL)
         request.httpMethod = "POST"
         request.setValue("application/x-amz-json-1.1", forHTTPHeaderField: "Content-Type")

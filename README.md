@@ -2,6 +2,8 @@
 
 SwiftUI 製の iOS アプリと、AWS SAM で構築するサーバーレスバックエンドのセットです。Cognito によるログイン機能付きで、ユーザーごとに専用のバックアップ領域に写真を保存します。
 
+アプリ自体には接続先が焼き込まれておらず、**初回起動時の設定画面で自分のAWS環境を登録する**方式です(QRコード読み取り/JSON貼り付け/手動入力)。各ユーザーが自分のAWSアカウントにバックエンドをデプロイして使う「持ち込みAWS」モデルなので、同じアプリバイナリを誰にでも配布できます。
+
 ## 仕組み(Cognito 認証 + presigned URL 方式)
 
 ```
@@ -62,23 +64,28 @@ sam deploy --guided
 #   その他はデフォルトで OK
 ```
 
-デプロイ完了時に表示される **Outputs** から次の 3 つを控えます:
+デプロイ完了時に表示される **Outputs** の `AppConfigJson` を控えます。次のような1行の JSON です(いずれの値も**秘密情報ではありません**。API はログインで保護されています):
 
-- `ApiEndpoint`(API の URL)
-- `UserPoolClientId`(Cognito アプリクライアント ID)
-- `Region`(リージョン)
-
-いずれも**秘密情報ではない**ので、リポジトリにコミットして問題ありません(API はログインで保護されています)。
-
-### 2. アプリの接続先を設定
-
-`ios/PhotoUploader/AppConfig.swift` の 3 つの値を、控えた Outputs の値に書き換えてコミットします(GitHub 上の編集でも OK):
-
-```swift
-static let apiBaseURL = URL(string: "<ApiEndpoint>")!
-static let cognitoRegion = "<Region>"
-static let cognitoClientId = "<UserPoolClientId>"
+```json
+{"apiEndpoint":"https://xxxx.execute-api.ap-northeast-1.amazonaws.com","region":"ap-northeast-1","clientId":"xxxxxxxx"}
 ```
+
+### 2. アプリの接続先を設定(アプリ内で完結)
+
+アプリの初回起動時に「接続先の設定」画面が表示されるので、次のいずれかで設定します:
+
+- **QRコード**: `AppConfigJson` の値を QR コードにして(後述)、アプリでスキャン
+- **貼り付け**: `AppConfigJson` の値をそのまま「まとめて貼り付け」欄にペースト
+- **手動入力**: URL・リージョン・クライアント ID を個別に入力
+
+QR コードは `AppConfigJson` の値を QR 化するだけです。例(Mac / Linux):
+
+```bash
+brew install qrencode   # または apt install qrencode
+qrencode -t ansiutf8 '<AppConfigJsonの値>'   # ターミナルに直接表示
+```
+
+オンラインの QR 生成サービスでも作れます(値に秘密情報は含まれないため問題ありません)。設定は端末内に保存され、初回の一度だけで済みます。
 
 ### 3. iOS アプリをビルド(Mac の場合)
 
@@ -92,9 +99,12 @@ open PhotoUploader.xcodeproj
 
 ## アプリの使い方
 
-1. 初回起動時にログイン画面が表示されます。「新規登録」でメールアドレスとパスワード(8文字以上)を登録
-2. メールに届く 6 桁の確認コードを入力すると、自動でログインされます(次回以降は自動ログイン)
-3. 「写真を選択」から複数枚(枚数無制限)選ぶと、4 並列で S3 へアップロードされ、進捗と結果が一覧に表示されます
+1. 初回起動時に「接続先の設定」画面が表示されます。QRコード/貼り付け/手動入力で自分のAWS環境を登録(一度だけ)
+2. ログイン画面で「新規登録」からメールアドレスとパスワード(8文字以上)を登録
+3. メールに届く 6 桁の確認コードを入力すると、自動でログインされます(次回以降は自動ログイン)
+4. 「写真を選択」から複数枚(枚数無制限)選ぶと、4 並列で S3 へアップロードされ、進捗と結果が一覧に表示されます
+
+別のAWS環境につなぎ直したい場合は、ログイン画面の「接続先の設定をやり直す」から再設定できます。
 
 **バックグラウンドアップロード対応:** 転送は background `URLSession` 経由なので、ホーム画面に戻る・他のアプリに切り替える・画面をロックしても、送信済みキューに入った分は OS が転送を継続します。署名付き URL が転送待ちの間に失効した場合(HTTP 403)は、新しい URL を取得して自動リトライ(最大 3 回)します。トークンの有効期限が切れていても、Keychain のリフレッシュトークンで自動更新されます。
 
@@ -161,16 +171,16 @@ GitHub Actions で push / PR ごとに以下の 3 ジョブを実行します:
 
 ### 画面の確認(スクリーンショット)
 
-push するたびに CI がシミュレータ上でアプリを実際に起動し、スクリーンショットを撮ります。`simulator-screenshots` Artifact を開くと、ログイン画面と新規登録画面が確認できます。
+push するたびに CI がシミュレータ上でアプリを実際に起動し、スクリーンショットを撮ります。`simulator-screenshots` Artifact を開くと、接続先設定画面・ログイン画面・新規登録画面が確認できます。
 
 ### 実機での利用(AltStore / Windows)
 
 Apple Developer Program に加入していなくても、Windows パソコンがあれば [AltStore](https://altstore.io/) で自分の iPhone にインストールできます:
 
-1. **事前準備:** 上記「セットアップ手順 2」のとおり `AppConfig.swift` にデプロイ結果の値を設定してコミットしておく(CI がビルドする .ipa にその値が焼き込まれます。いずれも秘密情報ではありません)
-2. Windows に [AltServer](https://altstore.io/) をインストール(iTunes / iCloud の**非 Microsoft Store 版**が必要)
-3. iPhone を USB 接続し、AltServer から AltStore を iPhone にインストール
-4. CI の `PhotoUploader-unsigned-ipa` Artifact をダウンロード・解凍し、.ipa を iPhone に転送(またはブラウザでダウンロード)
-5. iPhone の AltStore アプリで「+」→ .ipa を選択 → 無料の Apple ID で署名されてインストール完了
+1. Windows に [AltServer](https://altstore.io/) をインストール(iTunes / iCloud の**非 Microsoft Store 版**が必要)
+2. iPhone を USB 接続し、AltServer から AltStore を iPhone にインストール
+3. CI の `PhotoUploader-unsigned-ipa` Artifact をダウンロード・解凍し、.ipa を iPhone に転送(またはブラウザでダウンロード)
+4. iPhone の AltStore アプリで「+」→ .ipa を選択 → 無料の Apple ID で署名されてインストール完了
+5. アプリを起動し、「接続先の設定」画面で自分のAWS環境を登録(接続先はアプリ内で設定するので、.ipa は誰の環境の情報も含まない汎用バイナリです)
 
 **制限事項(無料 Apple ID の場合):** 署名の有効期限が 7 日間のため、週 1 回 AltStore での更新(Refresh)が必要です。同時にサイドロードできるアプリは 3 つまで。常用するなら Apple Developer Program($99/年)+ TestFlight 配信への移行がおすすめです。

@@ -81,6 +81,16 @@ struct AuthView: View {
             }
             .disabled(email.isEmpty || password.isEmpty)
         }
+
+        Section {
+            Button("接続先の設定をやり直す") {
+                errorMessage = nil
+                Task { await session.resetBackend() }
+            }
+            .font(.footnote)
+        } footer: {
+            Text("別のAWS環境に接続する場合はこちら")
+        }
     }
 
     @ViewBuilder
