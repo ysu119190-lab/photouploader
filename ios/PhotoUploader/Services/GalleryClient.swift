@@ -25,11 +25,14 @@ struct PhotoListResponse: Decodable {
 
 enum GalleryError: LocalizedError {
     case requestFailed(status: Int)
+    case unexpectedResponse(status: Int, bodyPrefix: String)
 
     var errorDescription: String? {
         switch self {
         case .requestFailed(let status):
             return "写真一覧の取得に失敗しました (HTTP \(status))"
+        case .unexpectedResponse(let status, let bodyPrefix):
+            return "サーバー応答を解釈できませんでした (HTTP \(status)): \(bodyPrefix)"
         }
     }
 }
@@ -60,6 +63,13 @@ enum GalleryClient {
             let status = (response as? HTTPURLResponse)?.statusCode ?? -1
             throw GalleryError.requestFailed(status: status)
         }
-        return try JSONDecoder().decode(PhotoListResponse.self, from: data)
+        do {
+            return try JSONDecoder().decode(PhotoListResponse.self, from: data)
+        } catch {
+            // Surface what the server actually sent so mismatches are
+            // diagnosable from the device.
+            let body = String(data: data.prefix(160), encoding: .utf8) ?? "(non-UTF8)"
+            throw GalleryError.unexpectedResponse(status: http.statusCode, bodyPrefix: body)
+        }
     }
 }
