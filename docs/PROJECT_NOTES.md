@@ -23,6 +23,8 @@
 | アプリアイコン / 起動スプラッシュアニメーション | 雲+アップロード矢印 |
 | バナー広告(AdMob) | メイン画面下部。テストID |
 | リワード広告(AdMob) | アップロード開始時に動画視聴。広告が無ければ素通し(フェイルオープン)。テストID |
+| パスワードリセット | ログイン画面から。メールのリセットコード→新パスワード設定 |
+| 保存済み写真の閲覧(「保存済み」タブ) | 新しい順グリッド・ページング・拡大表示・引っ張って更新 |
 
 ### バックエンド(AWS / SAM)
 
@@ -30,7 +32,7 @@
 |---|---|
 | S3バケット(暗号化・非公開) | キーは `uploads/<ユーザーID>/日付/UUID` でユーザー分離 |
 | Cognitoユーザープール + JWTオーソライザー | 共有APIキーは廃止済み |
-| presign Lambda(Python) | 1時間有効の署名付きPUT URL発行 |
+| API Lambda(Python) | `POST /presign`(署名付きPUT URL発行)+ `GET /photos`(写真一覧+署名付きGET URL) |
 | ワンクリック構築テンプレート | CloudFormationクイック作成リンク用の単一ファイル版 |
 | 配布者向けスクリプト | `publish-template.ps1/.sh`(リンク発行)、`show-config.ps1/.sh`(設定表示+QR生成) |
 
@@ -88,12 +90,12 @@
 
 ### 機能改善(優先度順の候補)
 
-- [ ] パスワードリセット(ForgotPassword)フロー
-- [ ] アップロード済み写真の一覧・閲覧(S3 ListObjects + 署名付きGET)
+- [x] パスワードリセット(ForgotPassword)フロー
+- [x] アップロード済み写真の一覧・閲覧(S3 ListObjects + 署名付きGET)
 - [ ] 自前の写真ピッカー(アップロード済みバッジ表示・ソート対応)
 - [ ] カメラ撮影からの直接アップロード
 - [ ] ATT(App Tracking Transparency)対応(広告パーソナライズする場合)
-- [ ] Sign in with Apple 対応(ストア公開時に推奨)
+- [ ] Sign in with Apple 対応 — **Apple Developer Program加入待ち**(SIWAのキー発行とアプリのentitlementに加入が必須。加入後: Cognitoにapple.com IDプロバイダ追加+アプリにASAuthorizationボタン実装)
 - [ ] 進捗一覧のアプリ再起動後の復元(アップロード自体は現状でも完走する)
 
 ### 運用メモ

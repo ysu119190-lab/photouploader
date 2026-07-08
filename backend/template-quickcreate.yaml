@@ -76,6 +76,8 @@ Resources:
       Policies:
         - S3WritePolicy:
             BucketName: !Ref PhotoBucket
+        - S3ReadPolicy:
+            BucketName: !Ref PhotoBucket
       Events:
         Presign:
           Type: HttpApi
@@ -83,15 +85,22 @@ Resources:
             ApiId: !Ref Api
             Path: /presign
             Method: POST
+        Photos:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /photos
+            Method: GET
       InlineCode: |
-        """Lambda handler that issues presigned S3 PUT URLs for photo uploads.
+        """Lambda handling the app's API. Two routes, both JWT-protected:
+
+        POST /presign  — issue a presigned S3 PUT URL for uploading one photo
+        GET  /photos   — list the caller's uploaded photos with presigned GET URLs
 
         The API Gateway JWT authorizer (Cognito) has already validated the caller's
         ID token before this handler runs; the verified claims arrive in the request
-        context. The iOS app POSTs {"contentType": "image/jpeg"} and receives
-        {"uploadUrl": ..., "key": ..., "expiresIn": ...}. It then PUTs the photo
-        bytes directly to S3 using that URL, so the app never needs AWS credentials
-        and the photo bytes never pass through Lambda. Each user's photos are stored
+        context. Photo bytes never pass through Lambda — uploads PUT directly to S3
+        and views GET directly from S3 via presigned URLs. Each user's photos live
         under their own uploads/<user id>/ prefix.
         """
 
@@ -134,6 +143,12 @@ Resources:
             if not user_id:
                 return _response(401, {"message": "Unauthorized"})
 
+            if event.get("routeKey") == "GET /photos":
+                return _list_photos(user_id, event)
+            return _presign(user_id, event)
+
+
+        def _presign(user_id, event):
             try:
                 body = json.loads(event.get("body") or "{}")
             except json.JSONDecodeError:
@@ -165,13 +180,57 @@ Resources:
             )
 
 
+        def _list_photos(user_id, event):
+            params = event.get("queryStringParameters") or {}
+            try:
+                offset = max(int(params.get("offset", "0")), 0)
+                limit = min(max(int(params.get("limit", "40")), 1), 100)
+            except ValueError:
+                return _response(400, {"message": "offset and limit must be integers"})
+
+            # Object keys embed the upload date (uploads/<sub>/YYYY/MM/DD/<uuid>),
+            # so a reverse key sort yields newest-first without extra metadata.
+            prefix = f"uploads/{user_id}/"
+            objects = []
+            kwargs = {"Bucket": BUCKET_NAME, "Prefix": prefix}
+            while True:
+                page = s3.list_objects_v2(**kwargs)
+                objects.extend(
+                    {
+                        "key": item["Key"],
+                        "size": item["Size"],
+                        "lastModified": item["LastModified"].isoformat(),
+                    }
+                    for item in page.get("Contents", [])
+                )
+                token = page.get("NextContinuationToken")
+                if not token:
+                    break
+                kwargs["ContinuationToken"] = token
+
+            objects.sort(key=lambda item: item["key"], reverse=True)
+            selected = objects[offset : offset + limit]
+            # Signing is local computation — no AWS calls — so per-item URLs are cheap.
+            for item in selected:
+                item["url"] = s3.generate_presigned_url(
+                    "get_object",
+                    Params={"Bucket": BUCKET_NAME, "Key": item["key"]},
+                    ExpiresIn=EXPIRES_IN_SECONDS,
+                )
+
+            next_offset = offset + limit if offset + limit < len(objects) else None
+            return _response(
+                200,
+                {"photos": selected, "total": len(objects), "nextOffset": next_offset},
+            )
+
+
         def _response(status_code, body):
             return {
                 "statusCode": status_code,
                 "headers": {"Content-Type": "application/json"},
                 "body": json.dumps(body),
             }
-
 Outputs:
   AppConfigJson:
     Description: >

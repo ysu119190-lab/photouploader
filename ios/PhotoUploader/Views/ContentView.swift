@@ -18,7 +18,16 @@ struct ContentView: View {
                 case .signedOut, .needsConfirmation:
                     AuthView(session: session)
                 case .signedIn:
-                    uploadView
+                    TabView {
+                        uploadView
+                            .tabItem {
+                                Label("バックアップ", systemImage: "square.and.arrow.up.on.square")
+                            }
+                        GalleryView()
+                            .tabItem {
+                                Label("保存済み", systemImage: "photo.stack")
+                            }
+                    }
                 }
             }
 

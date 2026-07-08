@@ -11,11 +11,21 @@ struct AuthView: View {
         var id: String { rawValue }
     }
 
+    private enum ResetPhase {
+        case none
+        case request
+        case confirm(email: String)
+    }
+
     @State private var mode: Mode = .signIn
     @State private var email = ""
     @State private var password = ""
     @State private var confirmationCode = ""
+    @State private var resetPhase: ResetPhase = .none
+    @State private var resetCode = ""
+    @State private var newPassword = ""
     @State private var errorMessage: String?
+    @State private var infoMessage: String?
     @State private var isBusy = false
 
     var body: some View {
@@ -24,7 +34,22 @@ struct AuthView: View {
                 if case .needsConfirmation(let pendingEmail, _) = session.state {
                     confirmationSections(for: pendingEmail)
                 } else {
-                    credentialSections
+                    switch resetPhase {
+                    case .none:
+                        credentialSections
+                    case .request:
+                        resetRequestSections
+                    case .confirm(let resetEmail):
+                        resetConfirmSections(for: resetEmail)
+                    }
+                }
+
+                if let infoMessage {
+                    Section {
+                        Text(infoMessage)
+                            .font(.callout)
+                            .foregroundStyle(.green)
+                    }
                 }
 
                 if let errorMessage {
@@ -89,6 +114,17 @@ struct AuthView: View {
             .disabled(email.isEmpty || password.isEmpty)
         }
 
+        if mode == .signIn {
+            Section {
+                Button("パスワードを忘れた場合") {
+                    errorMessage = nil
+                    infoMessage = nil
+                    resetPhase = .request
+                }
+                .font(.footnote)
+            }
+        }
+
         Section {
             Button("接続先の設定をやり直す") {
                 errorMessage = nil
@@ -101,6 +137,82 @@ struct AuthView: View {
                     Text("現在の接続先: \(host)")
                 }
                 Text("接続設定は端末に保存済みなので、再入力は不要です。別のAWS環境につなぎ替えるときだけやり直してください。")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var resetRequestSections: some View {
+        Section {
+            TextField("メールアドレス", text: $email)
+                .keyboardType(.emailAddress)
+                .textContentType(.emailAddress)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+        } header: {
+            Text("パスワードのリセット")
+        } footer: {
+            Text("登録済みのメールアドレスに6桁のリセットコードを送ります")
+        }
+
+        Section {
+            Button {
+                requestPasswordReset()
+            } label: {
+                HStack {
+                    Spacer()
+                    if isBusy {
+                        ProgressView()
+                    } else {
+                        Text("リセットコードを送信")
+                    }
+                    Spacer()
+                }
+            }
+            .disabled(email.isEmpty)
+
+            Button("キャンセル", role: .cancel) {
+                errorMessage = nil
+                resetPhase = .none
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func resetConfirmSections(for resetEmail: String) -> some View {
+        Section {
+            TextField("リセットコード", text: $resetCode)
+                .keyboardType(.numberPad)
+                .textContentType(.oneTimeCode)
+            SecureField("新しいパスワード(8文字以上)", text: $newPassword)
+                .textContentType(.newPassword)
+        } header: {
+            Text("新しいパスワードの設定")
+        } footer: {
+            Text("\(resetEmail) 宛てに送信された6桁のコードを入力してください")
+        }
+
+        Section {
+            Button {
+                confirmPasswordReset(for: resetEmail)
+            } label: {
+                HStack {
+                    Spacer()
+                    if isBusy {
+                        ProgressView()
+                    } else {
+                        Text("パスワードを変更する")
+                    }
+                    Spacer()
+                }
+            }
+            .disabled(resetCode.isEmpty || newPassword.isEmpty)
+
+            Button("キャンセル", role: .cancel) {
+                errorMessage = nil
+                resetCode = ""
+                newPassword = ""
+                resetPhase = .none
             }
         }
     }
@@ -141,8 +253,48 @@ struct AuthView: View {
         }
     }
 
+    private func requestPasswordReset() {
+        errorMessage = nil
+        infoMessage = nil
+        isBusy = true
+        Task { @MainActor in
+            defer { isBusy = false }
+            do {
+                try await CognitoAuthClient.forgotPassword(email: email)
+                resetPhase = .confirm(email: email)
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func confirmPasswordReset(for resetEmail: String) {
+        errorMessage = nil
+        infoMessage = nil
+        isBusy = true
+        Task { @MainActor in
+            defer { isBusy = false }
+            do {
+                try await CognitoAuthClient.confirmForgotPassword(
+                    email: resetEmail,
+                    code: resetCode,
+                    newPassword: newPassword
+                )
+                resetPhase = .none
+                resetCode = ""
+                newPassword = ""
+                password = ""
+                mode = .signIn
+                infoMessage = "パスワードを変更しました。新しいパスワードでログインしてください"
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
     private func submitCredentials() {
         errorMessage = nil
+        infoMessage = nil
         isBusy = true
         Task { @MainActor in
             defer { isBusy = false }

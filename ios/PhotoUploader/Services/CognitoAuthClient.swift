@@ -83,6 +83,38 @@ enum CognitoAuthClient {
         )
     }
 
+    /// Sends a password-reset code to the user's verified email address.
+    static func forgotPassword(email: String) async throws {
+        let config = try BackendConfigStore.required()
+        _ = try await call(
+            target: "ForgotPassword",
+            region: config.region,
+            payload: [
+                "ClientId": config.clientId,
+                "Username": email,
+            ]
+        )
+    }
+
+    /// Sets a new password using the emailed reset code.
+    static func confirmForgotPassword(
+        email: String,
+        code: String,
+        newPassword: String
+    ) async throws {
+        let config = try BackendConfigStore.required()
+        _ = try await call(
+            target: "ConfirmForgotPassword",
+            region: config.region,
+            payload: [
+                "ClientId": config.clientId,
+                "Username": email,
+                "ConfirmationCode": code,
+                "Password": newPassword,
+            ]
+        )
+    }
+
     static func signIn(email: String, password: String) async throws -> AuthTokens {
         let config = try BackendConfigStore.required()
         let result = try await call(
