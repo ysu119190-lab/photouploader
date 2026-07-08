@@ -38,9 +38,26 @@ aws s3api put-public-access-block --bucket $BucketName --public-access-block-con
     BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=false,RestrictPublicBuckets=false | Out-Null
 Assert-LastExit "パブリックアクセス設定を変更できませんでした。"
 
-$policy = "{`"Version`":`"2012-10-17`",`"Statement`":[{`"Sid`":`"PublicReadTemplate`",`"Effect`":`"Allow`",`"Principal`":`"*`",`"Action`":`"s3:GetObject`",`"Resource`":`"arn:aws:s3:::$BucketName/$Key`"}]}"
-aws s3api put-bucket-policy --bucket $BucketName --policy $policy | Out-Null
+# JSONは一時ファイル経由で渡す(PowerShell 5.1は引数中の引用符を剥がすため)
+$policy = @"
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PublicReadTemplate",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::$BucketName/$Key"
+    }
+  ]
+}
+"@
+$policyFile = Join-Path $env:TEMP "photouploader-bucket-policy.json"
+Set-Content -Path $policyFile -Value $policy -Encoding Ascii
+aws s3api put-bucket-policy --bucket $BucketName --policy "file://$policyFile" | Out-Null
 Assert-LastExit "バケットポリシーを設定できませんでした。"
+Remove-Item $policyFile -ErrorAction SilentlyContinue
 
 # テンプレートをアップロード
 aws s3 cp (Join-Path $PSScriptRoot "template-quickcreate.yaml") "s3://$BucketName/$Key" | Out-Null
