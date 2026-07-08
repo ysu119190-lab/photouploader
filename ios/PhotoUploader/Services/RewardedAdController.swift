@@ -31,10 +31,22 @@ final class RewardedAdController: NSObject {
     /// Returns true when the user earned the reward (finished watching).
     @MainActor
     func presentIfReady() async -> Bool {
-        guard let ad = rewardedAd, let root = Self.rootViewController else {
+        guard rewardedAd != nil, let root = Self.rootViewController else {
             preload()
             return false
         }
+
+        // The photo picker sheet is usually still animating closed when the
+        // upload flow reaches this point, and UIKit refuses to present a
+        // full-screen ad over an in-flight dismissal. Wait until nothing is
+        // presented (up to a few seconds) before showing the ad.
+        var waitedSeconds = 0.0
+        while root.presentedViewController != nil, waitedSeconds < 3.0 {
+            try? await Task.sleep(for: .milliseconds(200))
+            waitedSeconds += 0.2
+        }
+
+        guard let ad = rewardedAd else { return false }
         rewardedAd = nil
         didEarnReward = false
 
