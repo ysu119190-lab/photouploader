@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+
+jobs:
+  backend-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install cfn-lint
+        run: pip install cfn-lint
+      - name: Lint SAM template
+        run: cfn-lint backend/template.yaml
+      - name: Lint quick-create template
+        run: cfn-lint backend/template-quickcreate.yaml
+      - name: Compile Lambda source
+        run: python -m py_compile backend/src/presign/app.py
+      - name: Check quick-create template is in sync with Lambda source
+        run: |
+          pip install pyyaml
+          python scripts/check_quickcreate_sync.py
+
+  # Runs the app in an iOS Simulator via UI tests and publishes screenshots,
+  # so the UI can be verified without a local Mac.
+  ios-simulator-test:
+    # macos-15 ships Xcode 16, required to open the project format that
+    # current XcodeGen releases generate.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen and xcparse
+        run: brew install xcodegen chargepoint/xcparse/xcparse
+      - name: Generate Xcode project
+        run: xcodegen generate
+        working-directory: ios
+      - name: Run UI tests on iOS Simulator
+        run: >
+          xcodebuild test
+          -project PhotoUploader.xcodeproj
+          -scheme PhotoUploader
+          -destination 'platform=iOS Simulator,name=iPhone 16'
+          -resultBundlePath TestResults.xcresult
+          CODE_SIGNING_ALLOWED=NO
+        working-directory: ios
+      - name: Extract screenshots from test results
+        if: always()
+        run: xcparse screenshots ios/TestResults.xcresult simulator-screenshots
+      - name: Upload simulator screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulator-screenshots
+          path: simulator-screenshots
+          if-no-files-found: ignore
+
+  # Builds an unsigned device .ipa that can be sideloaded onto an iPhone with
+  # AltStore/SideStore (which re-sign it with a free Apple ID) — no Mac needed.
+  ios-unsigned-ipa:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: xcodegen generate
+        working-directory: ios
+      - name: Build unsigned device binary
+        run: >
+          xcodebuild build
+          -project PhotoUploader.xcodeproj
+          -scheme PhotoUploader
+          -configuration Release
+          -destination 'generic/platform=iOS'
+          -derivedDataPath DerivedData
+          CODE_SIGNING_ALLOWED=NO
+        working-directory: ios
+      - name: Package .ipa
+        run: |
+          mkdir -p Payload
+          cp -R ios/DerivedData/Build/Products/Release-iphoneos/PhotoUploader.app Payload/
+          zip -qry PhotoUploader-unsigned.ipa Payload
+      - name: Upload .ipa artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PhotoUploader-unsigned-ipa
+          path: PhotoUploader-unsigned.ipa
