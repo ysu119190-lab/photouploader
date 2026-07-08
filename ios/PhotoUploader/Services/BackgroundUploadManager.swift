@@ -19,6 +19,9 @@ final class BackgroundUploadManager: NSObject {
     private let lock = NSLock()
     private var continuations: [String: CheckedContinuation<String, Error>] = [:]
     private var progressHandlers: [String: @Sendable (Double) -> Void] = [:]
+    /// Response bodies keyed by task identifier, so S3's XML error detail can
+    /// be surfaced when an upload is rejected.
+    private var responseBodies: [Int: Data] = [:]
 
     private static let maxAttempts = 3
 
@@ -120,6 +123,30 @@ final class BackgroundUploadManager: NSObject {
     private func deleteFile(at url: URL) {
         try? FileManager.default.removeItem(at: url)
     }
+
+    private func takeResponseBody(for task: URLSessionTask) -> Data? {
+        lock.lock()
+        defer { lock.unlock() }
+        return responseBodies.removeValue(forKey: task.taskIdentifier)
+    }
+
+    /// Pulls <Code> and <Message> out of an S3 error XML body, e.g.
+    /// "SignatureDoesNotMatch: The request signature we calculated...".
+    private static func errorDetail(from body: Data?) -> String? {
+        guard let body, let xml = String(data: body, encoding: .utf8) else { return nil }
+        func tag(_ name: String) -> String? {
+            guard let start = xml.range(of: "<\(name)>"),
+                  let end = xml.range(of: "</\(name)>"),
+                  start.upperBound <= end.lowerBound
+            else { return nil }
+            return String(xml[start.upperBound..<end.lowerBound])
+        }
+        guard let code = tag("Code") else { return nil }
+        if let message = tag("Message") {
+            return "\(code): \(message)"
+        }
+        return code
+    }
 }
 
 extension BackgroundUploadManager: URLSessionTaskDelegate {
@@ -140,6 +167,7 @@ extension BackgroundUploadManager: URLSessionTaskDelegate {
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         guard let metadata = metadata(for: task) else { return }
         let fileURL = URL(fileURLWithPath: metadata.filePath)
+        let responseBody = takeResponseBody(for: task)
 
         if let error {
             deleteFile(at: fileURL)
@@ -170,8 +198,26 @@ extension BackgroundUploadManager: URLSessionTaskDelegate {
             }
         default:
             deleteFile(at: fileURL)
-            finish(metadata.uploadID, with: .failure(UploadError.uploadFailed(status: status)))
+            finish(
+                metadata.uploadID,
+                with: .failure(
+                    UploadError.uploadFailed(
+                        status: status,
+                        detail: Self.errorDetail(from: responseBody)
+                    )
+                )
+            )
         }
+    }
+}
+
+extension BackgroundUploadManager: URLSessionDataDelegate {
+    // Upload tasks deliver their (small) response bodies here; keep them so
+    // rejected uploads can show S3's error code instead of just the status.
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        lock.lock()
+        responseBodies[dataTask.taskIdentifier, default: Data()].append(data)
+        lock.unlock()
     }
 }
 

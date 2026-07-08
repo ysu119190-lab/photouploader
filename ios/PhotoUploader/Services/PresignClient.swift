@@ -9,7 +9,7 @@ struct PresignResponse: Decodable {
 enum UploadError: LocalizedError {
     case presignFailed(status: Int)
     case invalidUploadURL
-    case uploadFailed(status: Int)
+    case uploadFailed(status: Int, detail: String?)
 
     var errorDescription: String? {
         switch self {
@@ -17,7 +17,10 @@ enum UploadError: LocalizedError {
             return "アップロードURLの取得に失敗しました (HTTP \(status))"
         case .invalidUploadURL:
             return "サーバーから不正なURLが返されました"
-        case .uploadFailed(let status):
+        case .uploadFailed(let status, let detail):
+            if let detail, !detail.isEmpty {
+                return "S3へのアップロードに失敗しました (HTTP \(status) / \(detail))"
+            }
             return "S3へのアップロードに失敗しました (HTTP \(status))"
         }
     }
