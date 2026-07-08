@@ -17,8 +17,14 @@ jobs:
         run: pip install cfn-lint
       - name: Lint SAM template
         run: cfn-lint backend/template.yaml
+      - name: Lint quick-create template
+        run: cfn-lint backend/template-quickcreate.yaml
       - name: Compile Lambda source
         run: python -m py_compile backend/src/presign/app.py
+      - name: Check quick-create template is in sync with Lambda source
+        run: |
+          pip install pyyaml
+          python scripts/check_quickcreate_sync.py
 
   # Runs the app in an iOS Simulator via UI tests and publishes screenshots,
   # so the UI can be verified without a local Mac.

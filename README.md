@@ -47,6 +47,8 @@ ios/                   iOS アプリ(XcodeGen で .xcodeproj を生成)
 
 ## セットアップ手順
 
+> **一般の利用者に配布する場合**は、下の「[ワンクリック構築(クイック作成リンク)](#ワンクリック構築クイック作成リンク)」を参照してください。git や SAM CLI なしで、ブラウザだけでバックエンドを構築できます。以下は開発者向けの手順です。
+
 ### 前提
 
 - AWS アカウントと [AWS CLI](https://docs.aws.amazon.com/cli/)(認証設定済み)
@@ -106,6 +108,34 @@ open PhotoUploader.xcodeproj
 ```
 
 実機で動かす場合は Signing & Capabilities で自分の Team を選択して Run。Mac がない場合は後述の「Mac がなくても試す方法」へ。
+
+## ワンクリック構築(クイック作成リンク)
+
+一般の利用者(git や SAM CLI を知らない人)向けに、**ブラウザだけでバックエンドを構築できるリンク**を発行できます。
+
+### 配布者(あなた)が一度だけやること
+
+```powershell
+# Windows (PowerShell) — バケット名は世界で一意の名前に
+cd backend
+.\publish-template.ps1 -BucketName photouploader-template-yourname
+```
+
+```bash
+# Mac / Linux
+cd backend
+./publish-template.sh photouploader-template-yourname
+```
+
+スクリプトが単体テンプレート(`template-quickcreate.yaml`)をあなたの S3 に公開アップロードし、**利用者に配る「クイック作成リンク」**を表示します(テンプレートに秘密情報は含まれません)。バックエンドを更新したら再実行すればリンクはそのままで中身が更新されます。
+
+### 利用者がやること(git・コマンド不要)
+
+1. [AWS アカウントを作成](https://aws.amazon.com/jp/register-flow/)(無料。クレジットカード登録が必要)
+2. 配布された**クイック作成リンク**を開く(AWSコンソールへのログインを求められたらログイン)
+3. ページ下部の**承認チェックボックス**(IAM リソース作成と機能の承認)をオンにして「**スタックの作成**」を押す
+4. 3〜5分待って状態が `CREATE_COMPLETE` になったら、「**出力**」タブを開き **AppConfigJson** の値をコピー
+5. iPhone アプリの「接続先の設定」画面の「まとめて貼り付け」にペースト(またはQR化してスキャン)
 
 ## アプリの使い方
 
