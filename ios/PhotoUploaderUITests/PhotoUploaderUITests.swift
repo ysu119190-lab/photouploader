@@ -11,23 +11,21 @@ final class PhotoUploaderUITests: XCTestCase {
     func testSetupThenAuthScreens() throws {
         let app = XCUIApplication()
 
-        // First launch (fresh install): the setup screen is shown.
+        // First launch (fresh install): the setup screen is shown. Assert on
+        // the guide entry at the top of the form — rows further down (like
+        // the manual-input fields) may not exist yet because Form loads its
+        // rows lazily and off-screen rows are not materialized.
         app.launch()
         attachScreenshot(named: "00-splash")
         sleep(3)
-        XCTAssertTrue(
-            app.textFields["APIのURL"].waitForExistence(timeout: 10),
-            "接続先設定画面が表示されること"
-        )
+        let guideEntry = app.staticTexts["はじめての方はこちら(設定ガイド)"]
+        XCTAssertTrue(guideEntry.waitForExistence(timeout: 10), "接続先設定画面が表示されること")
         attachScreenshot(named: "01-setup")
 
         // Open the first-time guide and capture it too.
-        let guideLink = app.buttons["はじめての方はこちら(設定ガイド)"]
-        if guideLink.waitForExistence(timeout: 5) {
-            guideLink.tap()
-            sleep(1)
-            attachScreenshot(named: "01b-guide")
-        }
+        guideEntry.tap()
+        sleep(1)
+        attachScreenshot(named: "01b-guide")
         app.terminate()
 
         // Relaunch with a preset backend config (typing into the simulator is
