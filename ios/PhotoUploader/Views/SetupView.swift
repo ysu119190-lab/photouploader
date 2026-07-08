@@ -17,6 +17,11 @@ struct SetupView: View {
         NavigationStack {
             Form {
                 Section {
+                    LogoHeader(subtitle: nil)
+                }
+                .listRowBackground(Color.clear)
+
+                Section {
                     Text("バックアップ先となる、あなたのAWS環境の情報を設定します。バックエンドのデプロイ完了時に表示される値を使ってください(README参照)。")
                         .font(.callout)
                         .foregroundStyle(.secondary)

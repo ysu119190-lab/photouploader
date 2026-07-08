@@ -43,6 +43,11 @@ struct AuthView: View {
     @ViewBuilder
     private var credentialSections: some View {
         Section {
+            LogoHeader(subtitle: "写真をあなたのAWSへバックアップ")
+        }
+        .listRowBackground(Color.clear)
+
+        Section {
             Picker("モード", selection: $mode) {
                 ForEach(Mode.allCases) { mode in
                     Text(mode.rawValue).tag(mode)

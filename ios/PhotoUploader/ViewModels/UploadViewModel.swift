@@ -8,6 +8,14 @@ final class UploadViewModel: ObservableObject {
     @Published private(set) var items: [UploadItem] = []
     @Published private(set) var isUploading = false
 
+    var doneCount: Int {
+        items.filter { if case .done = $0.status { return true } else { return false } }.count
+    }
+
+    var failedCount: Int {
+        items.filter { if case .failed = $0.status { return true } else { return false } }.count
+    }
+
     /// How many photos are prepared and uploaded at the same time. Raising
     /// this speeds up large batches but increases memory and network pressure.
     private let maxConcurrentUploads = 4

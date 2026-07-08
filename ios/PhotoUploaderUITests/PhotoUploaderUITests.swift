@@ -12,6 +12,11 @@ final class PhotoUploaderUITests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
 
+        // Capture the animated splash, then wait for it to fade out before
+        // interacting with anything.
+        attachScreenshot(named: "00-splash")
+        sleep(3)
+
         // A fresh install has no backend configured, so setup comes first.
         let apiField = app.textFields["APIのURL"]
         XCTAssertTrue(apiField.waitForExistence(timeout: 10), "接続先設定画面が表示されること")

@@ -5,29 +5,55 @@ struct ContentView: View {
     @StateObject private var session = SessionStore()
     @StateObject private var viewModel = UploadViewModel()
     @State private var selection: [PhotosPickerItem] = []
+    @State private var isShowingSplash = true
 
     var body: some View {
-        Group {
-            switch session.state {
-            case .loading:
-                ProgressView()
-            case .needsSetup:
-                SetupView(session: session)
-            case .signedOut, .needsConfirmation:
-                AuthView(session: session)
-            case .signedIn:
-                uploadView
+        ZStack {
+            Group {
+                switch session.state {
+                case .loading:
+                    ProgressView()
+                case .needsSetup:
+                    SetupView(session: session)
+                case .signedOut, .needsConfirmation:
+                    AuthView(session: session)
+                case .signedIn:
+                    uploadView
+                }
+            }
+
+            if isShowingSplash {
+                SplashView()
+                    .zIndex(1)
+                    .transition(.opacity)
             }
         }
         .task {
             await session.bootstrap()
+            try? await Task.sleep(for: .seconds(1.6))
+            withAnimation(.easeOut(duration: 0.4)) {
+                isShowingSplash = false
+            }
         }
     }
 
     private var uploadView: some View {
         NavigationStack {
-            List(viewModel.items) { item in
-                UploadRow(item: item)
+            List {
+                if !viewModel.items.isEmpty {
+                    Section {
+                        ForEach(viewModel.items) { item in
+                            UploadRow(item: item)
+                        }
+                    } header: {
+                        UploadSummaryHeader(
+                            done: viewModel.doneCount,
+                            failed: viewModel.failedCount,
+                            total: viewModel.items.count,
+                            isUploading: viewModel.isUploading
+                        )
+                    }
+                }
             }
             .overlay {
                 if viewModel.items.isEmpty {
@@ -69,6 +95,35 @@ struct ContentView: View {
                 Task { await viewModel.handleSelection(picked) }
             }
         }
+    }
+}
+
+/// Batch progress bar shown above the upload list.
+private struct UploadSummaryHeader: View {
+    let done: Int
+    let failed: Int
+    let total: Int
+    let isUploading: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                if isUploading {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+                Text(isUploading ? "アップロード中" : "アップロード結果")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Text("完了 \(done)/\(total)\(failed > 0 ? "・失敗 \(failed)" : "")")
+                    .font(.caption)
+                    .monospacedDigit()
+            }
+            ProgressView(value: Double(done + failed), total: Double(max(total, 1)))
+                .tint(failed > 0 ? .orange : .accentColor)
+        }
+        .padding(.vertical, 6)
+        .textCase(nil)
     }
 }
 
