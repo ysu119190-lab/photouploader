@@ -9,4 +9,5 @@ import Foundation
 /// 3. Replace `bannerAdUnitID` below with your banner ad unit ID
 enum AdsConfig {
     static let bannerAdUnitID = "ca-app-pub-3940256099942544/2934735716"
+    static let rewardedAdUnitID = "ca-app-pub-3940256099942544/1712485313"
 }

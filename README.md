@@ -160,13 +160,16 @@ curl -X POST "<ApiEndpoint>/presign" \
 
 ## 広告(AdMob)
 
-メイン画面の下部に AdMob のバナー広告を表示します。現在は **Google 公式のテスト用 ID** が設定されており、サンプル広告が表示されるだけで収益は発生しません(テスト ID のまま本番配信するのは AdMob 規約違反なので注意)。
+2種類の広告を組み込んでいます。現在は **Google 公式のテスト用 ID** が設定されており、サンプル広告が表示されるだけで収益は発生しません(テスト ID のまま本番配信するのは AdMob 規約違反なので注意)。
+
+- **バナー広告**: メイン画面の下部に常時表示(320×50)
+- **リワード広告**: 写真を選んでアップロードを開始する直前に動画広告を表示し、視聴後にアップロードが始まります。広告が用意できない場合(オフライン・在庫なし)は**広告なしでそのままアップロードが始まる**設計です(バックアップ機能を広告の都合でブロックしないため)
 
 **本番化の手順(App Store 公開時):**
 
 1. [AdMob](https://admob.google.com/) アカウントを作成し、アプリを登録
 2. 発行された**アプリ ID** を `ios/project.yml` の `GADApplicationIdentifier` に設定
-3. バナー広告ユニットを作成し、その **広告ユニット ID** を `ios/PhotoUploader/Services/AdsConfig.swift` の `bannerAdUnitID` に設定
+3. バナーとリワードの広告ユニットを作成し、それぞれの **広告ユニット ID** を `ios/PhotoUploader/Services/AdsConfig.swift` の `bannerAdUnitID` / `rewardedAdUnitID` に設定
 4. `SKAdNetworkItems` に [Google 推奨の SKAdNetwork ID 一覧](https://developers.google.com/admob/ios/quick-start#update_your_infoplist)を追加
 5. 広告のパーソナライズを行う場合は ATT(App Tracking Transparency)対応と `NSUserTrackingUsageDescription` の追加を検討
 

@@ -107,7 +107,12 @@ struct ContentView: View {
                 guard !newValue.isEmpty else { return }
                 let picked = newValue
                 selection = []
-                Task { await viewModel.handleSelection(picked) }
+                Task {
+                    // Rewarded ad gates the upload; if none is available the
+                    // upload starts anyway (backups are never ad-blocked).
+                    _ = await RewardedAdController.shared.presentIfReady()
+                    await viewModel.handleSelection(picked)
+                }
             }
             .safeAreaInset(edge: .bottom) {
                 BannerAdView()
