@@ -10,6 +10,9 @@ actor TokenProvider {
 
     private struct StoredTokens: Codable {
         var idToken: String
+        // Optional so payloads persisted by app versions that only stored the
+        // ID token still decode; a refresh fills it in when first needed.
+        var accessToken: String?
         var refreshToken: String
         var expiresAt: Date
     }
@@ -24,6 +27,7 @@ actor TokenProvider {
         persist(
             StoredTokens(
                 idToken: tokens.idToken,
+                accessToken: tokens.accessToken,
                 refreshToken: tokens.refreshToken,
                 expiresAt: Date().addingTimeInterval(TimeInterval(tokens.expiresIn))
             )
@@ -39,16 +43,41 @@ actor TokenProvider {
     /// token when needed. Throws `AuthError.notSignedIn` when there is no
     /// session or the refresh token itself has expired.
     func validIdToken() async throws -> String {
+        try await validTokens().idToken
+    }
+
+    /// Returns a non-expired access token (for user-self-service calls like
+    /// account deletion), refreshing when needed.
+    func validAccessToken() async throws -> String {
+        let tokens = try await validTokens()
+        if let accessToken = tokens.accessToken {
+            return accessToken
+        }
+        // Pre-access-token payload that is still fresh — refresh to get one.
+        guard let accessToken = try await refreshTokens(with: tokens.refreshToken).accessToken else {
+            throw AuthError.unexpectedResponse
+        }
+        return accessToken
+    }
+
+    private func validTokens() async throws -> StoredTokens {
         guard let tokens = loadTokens() else {
             throw AuthError.notSignedIn
         }
         if tokens.expiresAt.timeIntervalSinceNow > 60 {
-            return tokens.idToken
+            return tokens
         }
+        return try await refreshTokens(with: tokens.refreshToken)
+    }
+
+    private func refreshTokens(with refreshToken: String) async throws -> StoredTokens {
         do {
-            let refreshed = try await CognitoAuthClient.refresh(refreshToken: tokens.refreshToken)
+            let refreshed = try await CognitoAuthClient.refresh(refreshToken: refreshToken)
             store(refreshed)
-            return refreshed.idToken
+            guard let stored = loadTokens() else {
+                throw AuthError.notSignedIn
+            }
+            return stored
         } catch let error as CognitoError where error.type == "NotAuthorizedException" {
             // Refresh token expired or revoked — the user must sign in again.
             signOut()
