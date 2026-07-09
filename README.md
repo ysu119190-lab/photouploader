@@ -247,3 +247,23 @@ Apple Developer Program に加入していなくても、Windows パソコンが
 5. アプリを起動し、「接続先の設定」画面で自分のAWS環境を登録(接続先はアプリ内で設定するので、.ipa は誰の環境の情報も含まない汎用バイナリです)
 
 **制限事項(無料 Apple ID の場合):** 署名の有効期限が 7 日間のため、週 1 回 AltStore での更新(Refresh)が必要です。同時にサイドロードできるアプリは 3 つまで。常用するなら Apple Developer Program($99/年)+ TestFlight 配信への移行がおすすめです。
+
+## 紹介ページ(ランディングページ)
+
+`docs/` にランディングページ(`index.html`)とプライバシーポリシー(`privacy.html`)を用意しています。GitHub Pages でそのまま公開できます。
+
+**公開手順:**
+
+1. GitHub リポジトリの **Settings → Pages** を開く
+2. **Source** を「Deploy from a branch」、**Branch** を `main` の `/docs` フォルダに設定して保存
+3. 数分後、`https://<ユーザー名>.github.io/<リポジトリ名>/` で公開されます
+
+公開前に、`docs/index.html`(フッターなど)と `docs/privacy.html` の角かっこ ［ ］(提供者名・連絡先・公開日)を埋めてください。公開後の `privacy.html` の URL は、App Store 申請時の「プライバシーポリシー URL」に使えます。
+
+> 開発用のメモ(`notes/`)は Pages で公開されないよう `docs/` の外に置いています。
+
+## ドキュメント
+
+- `notes/PROJECT_NOTES.md` — 実装済み機能・課題の記録・今後のタスク
+- `notes/zenn-article.md` — 技術記事の下書き
+- `notes/privacy-policy.md` — プライバシーポリシー(Markdown 版。Web 版は `docs/privacy.html`)

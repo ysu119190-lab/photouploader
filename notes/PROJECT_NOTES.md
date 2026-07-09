@@ -77,17 +77,17 @@
 - [ ] **Apple Developer Program加入**($99/年)← ユーザー作業
 - [ ] **TestFlight配信のCI構築**(証明書管理+自動アップロード)← 加入後にClaudeが実装
 - [ ] **AdMob本番化**: アカウント作成 → アプリID/広告ユニットIDの差し替え、SKAdNetworkリスト追加
-- [x] **プライバシーポリシー作成**(App Store審査で必須)— 下書き `docs/privacy-policy.md`。角かっこの事業者名・連絡先を埋め、公開URL(LP/GitHub Pages)を用意すれば完成
+- [x] **プライバシーポリシー作成**(App Store審査で必須)— 下書き `notes/privacy-policy.md`(Web版 `docs/privacy.html`)。角かっこの事業者名・連絡先を埋めれば完成
 - [ ] **App Privacy(栄養ラベル)申告** — AdMob利用のため「データ収集あり」の申告が必要(識別子・使用状況データ等)
 - [ ] **App Store審査対応**: 審査用デモ環境(デモ用AWSスタック+テストアカウント)の用意
 - [ ] スクリーンショット・紹介文などストア素材の作成
 
 ### 告知・マーケティング
 
-- [x] Zenn技術記事の下書き(`docs/zenn-article.md`)
+- [x] Zenn技術記事の下書き(`notes/zenn-article.md`)
+- [x] ランディングページ(`docs/index.html`)+ プライバシーポリシー(`docs/privacy.html`)— GitHub Pages(main / docs)で公開する
 - [ ] X(旧Twitter)リリース告知スレッド案
 - [ ] note向け一般紹介記事
-- [ ] ランディングページ(GitHub Pages)+ プライバシーポリシー掲載
 
 ### 機能改善(優先度順の候補)
 
