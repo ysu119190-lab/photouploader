@@ -18,7 +18,16 @@ struct ContentView: View {
                 case .signedOut, .needsConfirmation:
                     AuthView(session: session)
                 case .signedIn:
-                    uploadView
+                    TabView {
+                        uploadView
+                            .tabItem {
+                                Label("バックアップ", systemImage: "square.and.arrow.up.on.square")
+                            }
+                        GalleryView()
+                            .tabItem {
+                                Label("保存済み", systemImage: "photo.stack")
+                            }
+                    }
                 }
             }
 
@@ -91,7 +100,14 @@ struct ContentView: View {
                     }
                     .disabled(viewModel.isUploading)
                 }
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    NavigationLink {
+                        StorageModeView()
+                    } label: {
+                        Label("保存モード", systemImage: "gearshape")
+                    }
+                    .disabled(viewModel.isUploading)
+
                     PhotosPicker(
                         selection: $selection,
                         maxSelectionCount: nil,

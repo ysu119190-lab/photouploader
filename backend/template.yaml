@@ -75,6 +75,8 @@ Resources:
       Policies:
         - S3WritePolicy:
             BucketName: !Ref PhotoBucket
+        - S3ReadPolicy:
+            BucketName: !Ref PhotoBucket
       Events:
         Presign:
           Type: HttpApi
@@ -82,6 +84,12 @@ Resources:
             ApiId: !Ref Api
             Path: /presign
             Method: POST
+        Photos:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /photos
+            Method: GET
 
 Outputs:
   AppConfigJson:

@@ -23,6 +23,9 @@
 | アプリアイコン / 起動スプラッシュアニメーション | 雲+アップロード矢印 |
 | バナー広告(AdMob) | メイン画面下部。テストID |
 | リワード広告(AdMob) | アップロード開始時に動画視聴。広告が無ければ素通し(フェイルオープン)。テストID |
+| パスワードリセット | ログイン画面から。メールのリセットコード→新パスワード設定 |
+| 保存済み写真の閲覧(「保存済み」タブ) | 新しい順グリッド・ページング・拡大表示・引っ張って更新 |
+| 保存モード選択(標準 / 節約) | 標準=S3 Standard、節約=Glacier Instant Retrieval。バックアップタブの歯車から料金・制限付きで選択。以降のアップロードに適用 |
 
 ### バックエンド(AWS / SAM)
 
@@ -30,7 +33,7 @@
 |---|---|
 | S3バケット(暗号化・非公開) | キーは `uploads/<ユーザーID>/日付/UUID` でユーザー分離 |
 | Cognitoユーザープール + JWTオーソライザー | 共有APIキーは廃止済み |
-| presign Lambda(Python) | 1時間有効の署名付きPUT URL発行 |
+| API Lambda(Python) | `POST /presign`(署名付きPUT URL発行)+ `GET /photos`(写真一覧+署名付きGET URL) |
 | ワンクリック構築テンプレート | CloudFormationクイック作成リンク用の単一ファイル版 |
 | 配布者向けスクリプト | `publish-template.ps1/.sh`(リンク発行)、`show-config.ps1/.sh`(設定表示+QR生成) |
 
@@ -75,25 +78,26 @@
 - [ ] **Apple Developer Program加入**($99/年)← ユーザー作業
 - [ ] **TestFlight配信のCI構築**(証明書管理+自動アップロード)← 加入後にClaudeが実装
 - [ ] **AdMob本番化**: アカウント作成 → アプリID/広告ユニットIDの差し替え、SKAdNetworkリスト追加
-- [ ] **プライバシーポリシー作成**(App Store審査で必須)
+- [x] **プライバシーポリシー作成**(App Store審査で必須)— 下書き `notes/privacy-policy.md`(Web版 `docs/privacy.html`)。角かっこの事業者名・連絡先を埋めれば完成
+- [ ] **App Privacy(栄養ラベル)申告** — AdMob利用のため「データ収集あり」の申告が必要(識別子・使用状況データ等)
 - [ ] **App Store審査対応**: 審査用デモ環境(デモ用AWSスタック+テストアカウント)の用意
 - [ ] スクリーンショット・紹介文などストア素材の作成
 
 ### 告知・マーケティング
 
-- [x] Zenn技術記事の下書き(`docs/zenn-article.md`)
+- [x] Zenn技術記事の下書き(`notes/zenn-article.md`)
+- [x] ランディングページ(`docs/index.html`)+ プライバシーポリシー(`docs/privacy.html`)— GitHub Pages(main / docs)で公開する
+- [x] note向け一般紹介記事の下書き(`notes/note-article.md`)— スクショ差し込みとリンク追記で公開可
 - [ ] X(旧Twitter)リリース告知スレッド案
-- [ ] note向け一般紹介記事
-- [ ] ランディングページ(GitHub Pages)+ プライバシーポリシー掲載
 
 ### 機能改善(優先度順の候補)
 
-- [ ] パスワードリセット(ForgotPassword)フロー
-- [ ] アップロード済み写真の一覧・閲覧(S3 ListObjects + 署名付きGET)
+- [x] パスワードリセット(ForgotPassword)フロー
+- [x] アップロード済み写真の一覧・閲覧(S3 ListObjects + 署名付きGET)
 - [ ] 自前の写真ピッカー(アップロード済みバッジ表示・ソート対応)
 - [ ] カメラ撮影からの直接アップロード
 - [ ] ATT(App Tracking Transparency)対応(広告パーソナライズする場合)
-- [ ] Sign in with Apple 対応(ストア公開時に推奨)
+- [ ] Sign in with Apple 対応 — **Apple Developer Program加入待ち**(SIWAのキー発行とアプリのentitlementに加入が必須。加入後: Cognitoにapple.com IDプロバイダ追加+アプリにASAuthorizationボタン実装)
 - [ ] 進捗一覧のアプリ再起動後の復元(アップロード自体は現状でも完走する)
 
 ### 運用メモ

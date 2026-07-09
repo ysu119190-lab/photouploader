@@ -133,7 +133,8 @@ final class UploadViewModel: ObservableObject {
 
             let key = try await BackgroundUploadManager.shared.upload(
                 fileURL: fileURL,
-                contentType: contentType
+                contentType: contentType,
+                storageClass: StorageModeStore.current.rawValue
             ) { progress in
                 Task { @MainActor [weak self] in
                     self?.update(itemID) { $0.status = .uploading(progress: progress) }
