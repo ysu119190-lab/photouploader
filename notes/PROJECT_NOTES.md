@@ -82,7 +82,8 @@
 - [ ] **TestFlight配信のCI構築**(証明書管理+自動アップロード)← 加入後にClaudeが実装
 - [ ] **AdMob本番化**: アカウント作成 → アプリID/広告ユニットIDの差し替え、SKAdNetworkリスト追加
 - [x] **プライバシーポリシー作成**(App Store審査で必須)— 下書き `notes/privacy-policy.md`(Web版 `docs/privacy.html`)。角かっこの事業者名・連絡先を埋めれば完成
-- [ ] **App Privacy(栄養ラベル)申告** — AdMob利用のため「データ収集あり」の申告が必要(識別子・使用状況データ等)
+- [x] **App Privacy(栄養ラベル)申告の整理** — 回答内容を `notes/app-privacy-label.md` にまとめ済み(App Store Connectに転記するだけ。提出直前にGoogleの開示ガイドで最新を再確認)
+- [ ] **非パーソナライズ広告(NPA)設定の実装** — 栄養ラベルを「トラッキングなし」で申告する前提条件。GADRequestにnpa=1を付与 or UMP導入+AdMob管理画面設定(`notes/app-privacy-label.md` §2)
 - [ ] **App Store審査対応**: 審査用デモ環境(デモ用AWSスタック+テストアカウント)の用意
 - [ ] スクリーンショット・紹介文などストア素材の作成
 
