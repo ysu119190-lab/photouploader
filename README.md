@@ -222,7 +222,7 @@ curl -X POST "<ApiEndpoint>/presign" \
 
 ## CI
 
-GitHub Actions で push / PR ごとに以下の 3 ジョブを実行します:
+GitHub Actions で **プルリクエスト単位**(PR の作成・更新ごと)と **main へのマージ時**に以下の 3 ジョブを実行します。同じ PR に続けて push した場合は古い実行を自動キャンセルし、最新のコミットだけを検証します:
 
 | ジョブ | 内容 | 成果物(Artifacts) |
 |---|---|---|
@@ -236,7 +236,7 @@ GitHub Actions で push / PR ごとに以下の 3 ジョブを実行します:
 
 ### 画面の確認(スクリーンショット)
 
-push するたびに CI がシミュレータ上でアプリを実際に起動し、スクリーンショットを撮ります。`simulator-screenshots` Artifact を開くと、接続先設定画面・ログイン画面・新規登録画面が確認できます。
+PR を作成・更新するたびに CI がシミュレータ上でアプリを実際に起動し、スクリーンショットを撮ります。`simulator-screenshots` Artifact を開くと、接続先設定画面・ログイン画面・新規登録画面が確認できます。
 
 ### 実機での利用(AltStore / Windows)
 

@@ -2,7 +2,7 @@
 
 開発の記録。実装済みの機能、発生した課題と対応、今後のタスクをここにまとめる。
 
-最終更新: 2026-07-08
+最終更新: 2026-07-09
 
 ---
 
@@ -38,6 +38,8 @@
 | 配布者向けスクリプト | `publish-template.ps1/.sh`(リンク発行)、`show-config.ps1/.sh`(設定表示+QR生成) |
 
 ### CI(GitHub Actions)
+
+実行タイミングは **PR単位**(作成・更新ごと。同一PRへの連続pushは古い実行を自動キャンセル)+ **mainへのマージ時**(成果物の取得元)。ブランチへの push だけでは起動しない。
 
 | ジョブ | 内容 |
 |---|---|
@@ -102,6 +104,7 @@
 
 ### 運用メモ
 
-- ブランチ `claude/iphone-s3-photo-upload-5dqlos` で開発中 → そろそろ **mainへのマージ(PR作成)** を検討
+- `claude/iphone-s3-photo-upload-5dqlos` の内容は PR #1・#2 で main にマージ済み。以降の開発は新ブランチ(現在: `claude/iphone-s3-photo-upload-bbe4bg`)で行う
+- CI はPR単位実行に変更済み(2026-07-09)。マージ前の検証はPRを作成して行う(ブランチpushだけではCIが走らない)
 - クイック作成リンクのテンプレート更新は `publish-template.ps1` 再実行のみ(アプリ更新不要)。バケット/リージョンを変えた場合のみ `AppLinks.swift` の更新が必要
 - AltStore運用中は7日ごとのRefreshが必要(TestFlight移行で解消)
