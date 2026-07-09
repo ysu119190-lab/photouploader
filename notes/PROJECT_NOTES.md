@@ -86,8 +86,8 @@
 
 - [x] Zenn技術記事の下書き(`notes/zenn-article.md`)
 - [x] ランディングページ(`docs/index.html`)+ プライバシーポリシー(`docs/privacy.html`)— GitHub Pages(main / docs)で公開する
+- [x] note向け一般紹介記事の下書き(`notes/note-article.md`)— スクショ差し込みとリンク追記で公開可
 - [ ] X(旧Twitter)リリース告知スレッド案
-- [ ] note向け一般紹介記事
 
 ### 機能改善(優先度順の候補)
 
