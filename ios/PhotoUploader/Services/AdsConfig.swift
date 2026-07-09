@@ -1,4 +1,4 @@
-import Foundation
+import GoogleMobileAds
 
 /// AdMob configuration.
 ///
@@ -10,4 +10,17 @@ import Foundation
 enum AdsConfig {
     static let bannerAdUnitID = "ca-app-pub-3940256099942544/2934735716"
     static let rewardedAdUnitID = "ca-app-pub-3940256099942544/1712485313"
+
+    /// Every ad request must be created here. Requests carry npa=1 so Google
+    /// only serves non-personalized ads — the App Privacy label declares "no
+    /// tracking" and the app needs no ATT prompt, which is only true while
+    /// all requests stay non-personalized. Keep the AdMob console's consent
+    /// settings aligned with this (see notes/app-privacy-label.md).
+    static func makeRequest() -> GADRequest {
+        let request = GADRequest()
+        let extras = GADExtras()
+        extras.additionalParameters = ["npa": "1"]
+        request.register(extras)
+        return request
+    }
 }
