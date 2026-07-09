@@ -29,6 +29,7 @@ final class BackgroundUploadManager: NSObject {
         let uploadID: String
         let filePath: String
         let contentType: String
+        let storageClass: String
         let key: String
         let attempt: Int
     }
@@ -46,6 +47,7 @@ final class BackgroundUploadManager: NSObject {
     func upload(
         fileURL: URL,
         contentType: String,
+        storageClass: String,
         onProgress: @escaping @Sendable (Double) -> Void
     ) async throws -> String {
         let uploadID = UUID().uuidString
@@ -61,6 +63,7 @@ final class BackgroundUploadManager: NSObject {
                         uploadID: uploadID,
                         fileURL: fileURL,
                         contentType: contentType,
+                        storageClass: storageClass,
                         attempt: 1
                     )
                 } catch {
@@ -76,9 +79,13 @@ final class BackgroundUploadManager: NSObject {
         uploadID: String,
         fileURL: URL,
         contentType: String,
+        storageClass: String,
         attempt: Int
     ) async throws {
-        let presign = try await PresignClient.requestPresignedURL(contentType: contentType)
+        let presign = try await PresignClient.requestPresignedURL(
+            contentType: contentType,
+            storageClass: storageClass
+        )
         guard let uploadURL = URL(string: presign.uploadUrl) else {
             throw UploadError.invalidUploadURL
         }
@@ -87,11 +94,17 @@ final class BackgroundUploadManager: NSObject {
         request.httpMethod = "PUT"
         // Must match the contentType the URL was signed for.
         request.setValue(contentType, forHTTPHeaderField: "Content-Type")
+        // For non-STANDARD classes the URL is signed with the storage class,
+        // so the PUT must echo it in this header or S3 returns 403.
+        if let signedClass = presign.storageClass, signedClass != "STANDARD" {
+            request.setValue(signedClass, forHTTPHeaderField: "x-amz-storage-class")
+        }
 
         let metadata = TaskMetadata(
             uploadID: uploadID,
             filePath: fileURL.path,
             contentType: contentType,
+            storageClass: storageClass,
             key: presign.key,
             attempt: attempt
         )
@@ -189,6 +202,7 @@ extension BackgroundUploadManager: URLSessionTaskDelegate {
                         uploadID: metadata.uploadID,
                         fileURL: fileURL,
                         contentType: metadata.contentType,
+                        storageClass: metadata.storageClass,
                         attempt: metadata.attempt + 1
                     )
                 } catch {

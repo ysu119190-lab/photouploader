@@ -103,6 +103,10 @@
   .price .big span { background: linear-gradient(180deg, var(--sky), var(--azure));
     -webkit-background-clip: text; background-clip: text; color: transparent; }
   .price p { color: var(--muted); margin: 10px auto 0; max-width: 520px; }
+  .ptable { width: 100%; max-width: 520px; margin: 20px auto 0; border-collapse: collapse; font-size: 15px; }
+  .ptable th, .ptable td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; }
+  .ptable th { color: var(--muted); font-weight: 600; font-size: 13px; }
+  .ptable tbody tr:last-child td { border-bottom: none; }
 
   footer { border-top: 1px solid var(--border); padding: 34px 20px 56px; text-align: center; color: var(--muted); font-size: 14px; }
   footer a { color: var(--azure); text-decoration: none; }
@@ -153,8 +157,8 @@
       </div>
       <div class="card">
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7l9-4 9 4-9 4z"/><path d="M3 12l9 4 9-4"/><path d="M3 17l9 4 9-4"/></svg>
-        <h3>容量無制限・使った分だけ</h3>
-        <p>月額サブスクなし。ストレージは AWS の従量課金なので、預けた写真の分だけ。数十 GB なら月数十円〜数百円で収まります。</p>
+        <h3>保存モードを選べる</h3>
+        <p>月額サブスクなし、預けた分だけの従量課金。よく見る人向けの「標準」と、あまり見返さない人向けの「節約」を選べ、節約モードなら保存料は約1/5に。</p>
       </div>
     </div>
   </div>
@@ -176,8 +180,15 @@
   <div class="wrap">
     <div class="price">
       <div class="big">アプリは無料。<span>預けた分だけ AWS 実費。</span></div>
-      <p>月額サブスクリプションはありません。ストレージ費用はあなたの AWS アカウントに直接かかり、写真 100GB でおおよそ月 400 円程度が目安です(2026年時点・東京リージョン)。</p>
-      <p class="note">※ 実際の料金は AWS の料金体系・保存量・通信量により変動します。</p>
+      <p>月額サブスクリプションはありません。ストレージ費用はあなたの AWS アカウントに直接かかり、用途に合わせて2つの保存モードから選べます。</p>
+      <table class="ptable">
+        <thead><tr><th>保存モード</th><th>100GBあたりの目安</th><th>向いている人</th></tr></thead>
+        <tbody>
+          <tr><td><strong>標準</strong></td><td>約375〜400円/月</td><td>写真をよく見返す</td></tr>
+          <tr><td><strong>節約</strong></td><td>約75円/月</td><td>バックアップとして預ける</td></tr>
+        </tbody>
+      </table>
+      <p class="note">※ 節約モードは保存料が大幅に安い一方、写真を表示(取り出し)する際にごく少額の料金がかかります。すぐ表示できる点は標準と同じです。実際の料金は AWS の料金体系・保存量・通信量・為替により変動します(2026年時点・東京リージョンでの概算)。</p>
     </div>
   </div>
 </section>

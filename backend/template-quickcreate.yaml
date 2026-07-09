@@ -131,6 +131,11 @@ Resources:
             "image/gif": ".gif",
         }
 
+        # S3 storage classes the app may request. STANDARD is the default (frequent
+        # viewing); GLACIER_IR (Glacier Instant Retrieval) is much cheaper to store
+        # and still retrieves instantly, suited to seldom-viewed backups.
+        ALLOWED_STORAGE_CLASSES = {"STANDARD", "GLACIER_IR"}
+
 
         def handler(event, _context):
             claims = (
@@ -165,18 +170,39 @@ Resources:
                     },
                 )
 
+            storage_class = body.get("storageClass", "STANDARD")
+            if storage_class not in ALLOWED_STORAGE_CLASSES:
+                return _response(
+                    400,
+                    {
+                        "message": "Unsupported storageClass",
+                        "allowed": sorted(ALLOWED_STORAGE_CLASSES),
+                    },
+                )
+
             now = datetime.datetime.now(datetime.timezone.utc)
             key = f"uploads/{user_id}/{now:%Y/%m/%d}/{uuid.uuid4()}{extension}"
 
+            params = {"Bucket": BUCKET_NAME, "Key": key, "ContentType": content_type}
+            # STANDARD is S3's default; only sign a StorageClass when it differs, so
+            # the client only needs the x-amz-storage-class header for GLACIER_IR.
+            if storage_class != "STANDARD":
+                params["StorageClass"] = storage_class
+
             upload_url = s3.generate_presigned_url(
                 "put_object",
-                Params={"Bucket": BUCKET_NAME, "Key": key, "ContentType": content_type},
+                Params=params,
                 ExpiresIn=EXPIRES_IN_SECONDS,
             )
 
             return _response(
                 200,
-                {"uploadUrl": upload_url, "key": key, "expiresIn": EXPIRES_IN_SECONDS},
+                {
+                    "uploadUrl": upload_url,
+                    "key": key,
+                    "expiresIn": EXPIRES_IN_SECONDS,
+                    "storageClass": storage_class,
+                },
             )
 
 

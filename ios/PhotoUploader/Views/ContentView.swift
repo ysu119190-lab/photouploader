@@ -100,7 +100,14 @@ struct ContentView: View {
                     }
                     .disabled(viewModel.isUploading)
                 }
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    NavigationLink {
+                        StorageModeView()
+                    } label: {
+                        Label("保存モード", systemImage: "gearshape")
+                    }
+                    .disabled(viewModel.isUploading)
+
                     PhotosPicker(
                         selection: $selection,
                         maxSelectionCount: nil,
