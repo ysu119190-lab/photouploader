@@ -12,6 +12,13 @@ struct RemotePhoto: Decodable, Identifiable {
 
     var imageURL: URL? { URL(string: url) }
 
+    /// The key's extension is assigned by the backend per content type, so it
+    /// reliably distinguishes videos from photos.
+    var isVideo: Bool {
+        let ext = (key as NSString).pathExtension.lowercased()
+        return ["mp4", "mov", "m4v"].contains(ext)
+    }
+
     var uploadedAt: Date? {
         ISO8601DateFormatter().date(from: lastModified)
     }

@@ -91,7 +91,7 @@ struct ContentView: View {
                     ContentUnavailableView(
                         "写真がありません",
                         systemImage: "photo.on.rectangle.angled",
-                        description: Text("右上のボタンから写真を選ぶとS3にアップロードします")
+                        description: Text("右上のボタンから写真や動画を選ぶとS3にアップロードします")
                     )
                 }
             }
@@ -119,10 +119,10 @@ struct ContentView: View {
                     PhotosPicker(
                         selection: $selection,
                         maxSelectionCount: nil,
-                        matching: .images,
+                        matching: .any(of: [.images, .videos]),
                         photoLibrary: .shared()
                     ) {
-                        Label("写真を選択", systemImage: "photo.badge.plus")
+                        Label("写真・動画を選択", systemImage: "photo.badge.plus")
                     }
                     .disabled(viewModel.isUploading)
                 }
@@ -243,7 +243,7 @@ private struct HistoryRow: View {
     }
 
     private var summaryText: String {
-        var parts = ["\(batch.total)枚中\(batch.done)枚アップロード"]
+        var parts = ["\(batch.total)件中\(batch.done)件アップロード"]
         if batch.skipped > 0 { parts.append("スキップ\(batch.skipped)") }
         if batch.failed > 0 { parts.append("失敗\(batch.failed)") }
         return parts.joined(separator: "・")
