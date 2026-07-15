@@ -42,21 +42,29 @@ enum UploadHistoryStore {
 
 /// Remembers which photo-library assets were already uploaded, so re-selected
 /// photos are skipped instead of being backed up twice.
+///
+/// Lookups happen per grid cell per render in the library picker and per
+/// asset in the differential-backup scan, so the set lives in memory;
+/// UserDefaults is only touched on mutation and first load.
+@MainActor
 enum UploadedAssetsStore {
     private static let key = "uploaded-asset-ids"
 
+    private static var cache: Set<String> = Set(
+        UserDefaults.standard.stringArray(forKey: key) ?? []
+    )
+
     static func contains(_ id: String) -> Bool {
-        (UserDefaults.standard.stringArray(forKey: key) ?? []).contains(id)
+        cache.contains(id)
     }
 
     static func insert(_ id: String) {
-        var ids = UserDefaults.standard.stringArray(forKey: key) ?? []
-        guard !ids.contains(id) else { return }
-        ids.append(id)
-        UserDefaults.standard.set(ids, forKey: key)
+        guard cache.insert(id).inserted else { return }
+        UserDefaults.standard.set(Array(cache), forKey: key)
     }
 
     static func clear() {
+        cache = []
         UserDefaults.standard.removeObject(forKey: key)
     }
 }

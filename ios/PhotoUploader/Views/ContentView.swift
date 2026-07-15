@@ -9,6 +9,8 @@ struct ContentView: View {
     @State private var isConfirmingAccountDeletion = false
     @State private var isDeletingAccount = false
     @State private var accountDeletionError: String?
+    @State private var isShowingLibraryPicker = false
+    @State private var isShowingCamera = false
 
     var body: some View {
         ZStack {
@@ -52,19 +54,55 @@ struct ContentView: View {
     private var uploadView: some View {
         NavigationStack {
             List {
+                if !viewModel.isUploading {
+                    Section {
+                        Button {
+                            startDifferentialBackup()
+                        } label: {
+                            Label("新着をまとめてバックアップ", systemImage: "arrow.triangle.2.circlepath")
+                        }
+                        Button {
+                            isShowingLibraryPicker = true
+                        } label: {
+                            Label("ライブラリから選ぶ(アップ済み表示)", systemImage: "photo.stack")
+                        }
+                        if CameraCaptureView.isCameraAvailable {
+                            Button {
+                                isShowingCamera = true
+                            } label: {
+                                Label("カメラで撮ってバックアップ", systemImage: "camera")
+                            }
+                        }
+                    } footer: {
+                        Text("「新着をまとめてバックアップ」は、まだバックアップしていない写真・動画を自動で探してアップロードします。アルバム分けも保存先に反映されます(初回は写真へのアクセス許可が必要)")
+                    }
+                }
+
                 if !viewModel.items.isEmpty {
                     Section {
                         ForEach(viewModel.items) { item in
                             UploadRow(item: item)
                         }
                     } header: {
-                        UploadSummaryHeader(
-                            done: viewModel.doneCount,
-                            skipped: viewModel.skippedCount,
-                            failed: viewModel.failedCount,
-                            total: viewModel.items.count,
-                            isUploading: viewModel.isUploading
-                        )
+                        VStack(alignment: .leading, spacing: 8) {
+                            UploadSummaryHeader(
+                                done: viewModel.doneCount,
+                                skipped: viewModel.skippedCount,
+                                failed: viewModel.failedCount,
+                                total: viewModel.items.count,
+                                isUploading: viewModel.isUploading
+                            )
+                            if !viewModel.isUploading && viewModel.hasRetryableFailures {
+                                Button {
+                                    Task { await viewModel.retryFailedItems() }
+                                } label: {
+                                    Label("失敗した項目を再試行", systemImage: "arrow.clockwise")
+                                        .font(.subheadline)
+                                }
+                                .buttonStyle(.borderless)
+                                .textCase(nil)
+                            }
+                        }
                     }
                 }
 
@@ -86,14 +124,13 @@ struct ContentView: View {
                     }
                 }
             }
-            .overlay {
-                if viewModel.items.isEmpty && viewModel.history.isEmpty {
-                    ContentUnavailableView(
-                        "写真がありません",
-                        systemImage: "photo.on.rectangle.angled",
-                        description: Text("右上のボタンから写真や動画を選ぶとS3にアップロードします")
-                    )
-                }
+            .alert(
+                "バックアップ",
+                isPresented: Binding(isPresent: $viewModel.infoMessage)
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(viewModel.infoMessage ?? "")
             }
             .navigationTitle("Photo Uploader")
             .toolbar {
@@ -131,12 +168,24 @@ struct ContentView: View {
                 guard !newValue.isEmpty else { return }
                 let picked = newValue
                 selection = []
-                Task {
-                    // Rewarded ad gates the upload; if none is available the
-                    // upload starts anyway (backups are never ad-blocked).
-                    _ = await RewardedAdController.shared.presentIfReady()
+                runAfterRewardedAd {
                     await viewModel.handleSelection(picked)
                 }
+            }
+            .sheet(isPresented: $isShowingLibraryPicker) {
+                LibraryPickerView { assets in
+                    runAfterRewardedAd {
+                        await viewModel.handleAssets(assets)
+                    }
+                }
+            }
+            .fullScreenCover(isPresented: $isShowingCamera) {
+                CameraCaptureView { image in
+                    Task {
+                        await viewModel.handleCapturedImage(image)
+                    }
+                }
+                .ignoresSafeArea()
             }
             .safeAreaInset(edge: .bottom) {
                 BannerAdView()
@@ -158,14 +207,31 @@ struct ContentView: View {
             }
             .alert(
                 "アカウントを削除できませんでした",
-                isPresented: Binding(
-                    get: { accountDeletionError != nil },
-                    set: { if !$0 { accountDeletionError = nil } }
-                )
+                isPresented: Binding(isPresent: $accountDeletionError)
             ) {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(accountDeletionError ?? "")
+            }
+        }
+    }
+
+    /// Rewarded ad gates every upload entry point; if no ad is available the
+    /// upload starts anyway (backups are never ad-blocked). The controller
+    /// waits for any dismissing sheet before presenting.
+    private func runAfterRewardedAd(_ work: @escaping () async -> Void) {
+        Task {
+            _ = await RewardedAdController.shared.presentIfReady()
+            await work()
+        }
+    }
+
+    private func startDifferentialBackup() {
+        Task {
+            // The rewarded ad only plays when the scan actually found
+            // something to upload (never for an empty diff).
+            await viewModel.backupNewItems {
+                _ = await RewardedAdController.shared.presentIfReady()
             }
         }
     }
@@ -306,6 +372,10 @@ private struct UploadRow: View {
             Text(message)
                 .font(.caption)
                 .foregroundStyle(.red)
+        case .interrupted:
+            Text("アプリ再起動により中断(転送は完了している場合があります。「保存済み」タブで確認できます)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -326,6 +396,9 @@ private struct UploadRow: View {
         case .failed:
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.red)
+        case .interrupted:
+            Image(systemName: "questionmark.circle")
+                .foregroundStyle(.secondary)
         }
     }
 }

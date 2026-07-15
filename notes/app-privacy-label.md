@@ -85,7 +85,7 @@ Apple の定義では、**「デバイス外に送信され、開発者または
 - [x] ポリシーの「アカウント削除」をアプリ内削除の実装に合わせて更新(2026-07-09)
 - [x] 案Aで行く場合: **NPA 設定の実装** — アプリ側は実装済み(§2)。AdMob 管理画面側の設定のみ本番化時に
 - [ ] App Store Connect の「プライバシーポリシー URL」に GitHub Pages の
-      `https://<ユーザー名>.github.io/iphon/privacy.html` を設定(Pages 有効化が先)
+      `https://<ユーザー名>.github.io/photouploader/privacy.html` を設定(Pages 有効化が先)
 - [ ] 提出直前に Google のデータ開示ガイドと Xcode の Privacy Report で最終確認
 
 ## 5. App Store Connect での入力手順

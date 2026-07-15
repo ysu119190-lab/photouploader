@@ -1,0 +1,130 @@
+name: TestFlight
+
+# ============================================================================
+# TestFlight 配信ワークフロー(下書き)
+#
+# Apple Developer Program 加入後に使える状態にしてあります。それまでは
+# 手動実行(workflow_dispatch)のみで、Secrets 未設定なら最初のステップで
+# 分かりやすく失敗します。
+#
+# ● 有効化までの手順
+#   1. Apple Developer Program に加入し、App Store Connect でアプリを登録
+#      (Bundle ID を決める。com.example.* のままでは提出できないので
+#       ios/project.yml の bundleIdPrefix を自分のものに変更すること)
+#   2. App Store Connect → ユーザとアクセス → 統合 → App Store Connect API
+#      で API キーを発行(役割: App Manager)。.p8 ファイルを保存
+#   3. Keychain Access などで Apple Distribution 証明書を作成し .p12 で書き出す
+#   4. リポジトリの Settings → Secrets and variables → Actions に登録:
+#        ASC_API_KEY_P8      .p8 の中身を base64 したもの(base64 -i AuthKey_XXX.p8)
+#        ASC_KEY_ID          API キーの Key ID
+#        ASC_ISSUER_ID       Issuer ID
+#        APPLE_TEAM_ID       Developer アカウントの Team ID(10桁英数)
+#        DIST_CERT_P12       Apple Distribution 証明書 .p12 を base64 したもの
+#        DIST_CERT_PASSWORD  .p12 のパスワード
+#   5. Actions → TestFlight → Run workflow で配信
+#
+# ビルド番号は GitHub Actions の run number を使うので、実行のたびに単調増加
+# します(マーケティングバージョンは ios/project.yml 側で管理)。
+# ============================================================================
+
+on:
+  workflow_dispatch:
+
+jobs:
+  upload-to-testflight:
+    runs-on: macos-15
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - name: Check required secrets
+        env:
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+          DIST_CERT_P12: ${{ secrets.DIST_CERT_P12 }}
+          DIST_CERT_PASSWORD: ${{ secrets.DIST_CERT_PASSWORD }}
+        run: |
+          missing=""
+          for name in ASC_API_KEY_P8 ASC_KEY_ID ASC_ISSUER_ID APPLE_TEAM_ID DIST_CERT_P12 DIST_CERT_PASSWORD; do
+            if [ -z "$(eval echo "\$$name")" ]; then
+              missing="$missing $name"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::次の Secrets が未設定です:$missing"
+            echo "::error::ワークフロー冒頭のコメントの手順で登録してください"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+        working-directory: ios
+
+      - name: Import distribution certificate into a temporary keychain
+        env:
+          DIST_CERT_P12: ${{ secrets.DIST_CERT_P12 }}
+          DIST_CERT_PASSWORD: ${{ secrets.DIST_CERT_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
+          KEYCHAIN_PASSWORD=$(uuidgen)
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security default-keychain -s "$KEYCHAIN_PATH"
+          echo "${DIST_CERT_P12}" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN_PATH" \
+            -P "${DIST_CERT_PASSWORD}" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          rm "$RUNNER_TEMP/cert.p12"
+
+      - name: Write App Store Connect API key
+        env:
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+        run: |
+          mkdir -p "$HOME/private_keys"
+          echo "${ASC_API_KEY_P8}" | base64 --decode \
+            > "$HOME/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+
+      - name: Archive (Release, device)
+        run: >
+          xcodebuild archive
+          -project PhotoUploader.xcodeproj
+          -scheme PhotoUploader
+          -configuration Release
+          -destination 'generic/platform=iOS'
+          -archivePath "$RUNNER_TEMP/PhotoUploader.xcarchive"
+          -allowProvisioningUpdates
+          -authenticationKeyPath "$HOME/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          -authenticationKeyID "${ASC_KEY_ID}"
+          -authenticationKeyIssuerID "${ASC_ISSUER_ID}"
+          DEVELOPMENT_TEAM="${APPLE_TEAM_ID}"
+          CODE_SIGN_STYLE=Automatic
+          CURRENT_PROJECT_VERSION=${{ github.run_number }}
+        working-directory: ios
+
+      - name: Export and upload to TestFlight
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>${APPLE_TEAM_ID}</string>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/PhotoUploader.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
+            -authenticationKeyID "${ASC_KEY_ID}" \
+            -authenticationKeyIssuerID "${ASC_ISSUER_ID}"
