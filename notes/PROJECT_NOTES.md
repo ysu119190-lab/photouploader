@@ -89,7 +89,12 @@
 
 - [ ] **Apple Developer Program加入**($99/年)← ユーザー作業
 - [ ] **TestFlight配信のCI構築**(証明書管理+自動アップロード)← 加入後にClaudeが実装
-- [ ] **AdMob本番化**: アカウント作成 → アプリID/広告ユニットIDの差し替え、SKAdNetworkリスト追加
+- [x] **AdMob本番化(アプリ側)**(2026-07-15)— 本番アプリID+広告ユニット3種(バナー/リワード/App Open)を設定。ReleaseのみID有効・DebugはテストID(`#if DEBUG`)。SKAdNetworkリスト(42件)追加、`docs/app-ads.txt` 設置。App Open広告は「60秒以上のバックグラウンド復帰時のみ」表示
+- [ ] **AdMob本番化(残り・あなたの作業)**:
+  - AdMob管理画面の**EU同意設定をNPA運用に合わせる**(プライバシーとメッセージ)
+  - **app-ads.txt をドメイン直下に置く** — 仕様上 `ysu119190-lab.github.io/app-ads.txt`(ドメインルート)が参照されるため、`ysu119190-lab.github.io` という名前のリポジトリを作り `app-ads.txt` 1ファイルを置いてPagesを有効化(2分)。docs/ 内のコピーはパス付きURLなので保険
+  - ストア公開後: AdMobのアプリをApp Storeリスティングに紐づけ → app-ads.txtの確認クロールを実行
+  - 提出前にSKAdNetworkリストをGoogle公式の最新と照合(https://developers.google.com/admob/ios/3p-skadnetworks — 開発環境からは取得不可だったため既知の公式リストを使用)
 - [x] **プライバシーポリシー作成**(App Store審査で必須)— 下書き `notes/privacy-policy.md`(Web版 `docs/privacy.html`)。角かっこの事業者名・連絡先を埋めれば完成
 - [x] **App Privacy(栄養ラベル)申告の整理** — 回答内容を `notes/app-privacy-label.md` にまとめ済み(App Store Connectに転記するだけ。提出直前にGoogleの開示ガイドで最新を再確認)
 - [x] **非パーソナライズ広告(NPA)設定の実装** — 全広告リクエストが `AdsConfig.makeRequest()`(npa=1)経由に。ATT不要・「トラッキングなし」申告が可能に。AdMob管理画面のEU同意設定のみ本番化時に要対応

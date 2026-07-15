@@ -222,22 +222,17 @@ curl -X POST "<ApiEndpoint>/presign" \
 
 ## 広告(AdMob)
 
-2種類の広告を組み込んでいます。現在は **Google 公式のテスト用 ID** が設定されており、サンプル広告が表示されるだけで収益は発生しません(テスト ID のまま本番配信するのは AdMob 規約違反なので注意)。
+3種類の広告を組み込んでいます。**Release ビルドは本番の広告ユニット、Debug ビルド(CI 含む)は Google 公式のテスト ID** を使う構成です(`AdsConfig.swift` の `#if DEBUG`)。開発中に本番広告を表示・タップすると無効トラフィックとしてアカウント停止のリスクがあるため、この切り替えは崩さないでください。
 
 - **バナー広告**: メイン画面の下部に常時表示(320×50)
 - **リワード広告**: 写真を選んでアップロードを開始する直前に動画広告を表示し、視聴後にアップロードが始まります。広告が用意できない場合(オフライン・在庫なし)は**広告なしでそのままアップロードが始まる**設計です(バックアップ機能を広告の都合でブロックしないため)
+- **アプリ起動時広告(App Open)**: バックグラウンドから**60秒以上あけて**復帰したときにだけ表示します。初回起動(スプラッシュ〜設定フロー)や、ピッカー・カメラ・リワード広告などの表示中には出しません。これもフェイルオープンです
 
 広告リクエストはすべて **非パーソナライズ(NPA)** で送信します(`AdsConfig.makeRequest()` が `npa=1` を付与)。このため ATT(トラッキング許可ダイアログ)の実装は不要で、App Store の App Privacy も「トラッキングなし」で申告できます(詳細は `notes/app-privacy-label.md`)。パーソナライズ広告に切り替える場合は ATT 対応と申告の変更が必要です。
 
-**本番化の手順(App Store 公開時):**
+**設定済みの本番化要素**: アプリ ID(`project.yml` の `GADApplicationIdentifier`)、3つの広告ユニット ID(`AdsConfig.swift`)、Google 推奨の SKAdNetwork リスト、`app-ads.txt`(GitHub Pages で配信)。
 
-1. [AdMob](https://admob.google.com/) アカウントを作成し、アプリを登録
-2. 発行された**アプリ ID** を `ios/project.yml` の `GADApplicationIdentifier` に設定
-3. バナーとリワードの広告ユニットを作成し、それぞれの **広告ユニット ID** を `ios/PhotoUploader/Services/AdsConfig.swift` の `bannerAdUnitID` / `rewardedAdUnitID` に設定
-4. `SKAdNetworkItems` に [Google 推奨の SKAdNetwork ID 一覧](https://developers.google.com/admob/ios/quick-start#update_your_infoplist)を追加
-5. 広告のパーソナライズを行う場合は ATT(App Tracking Transparency)対応と `NSUserTrackingUsageDescription` の追加を検討
-
-なお、AdMob の収益化は実質的に App Store で公開されたアプリが前提です(AltStore 等のサイドロード配布では審査・収益化ができません)。
+なお、AdMob の収益化は実質的に App Store で公開されたアプリが前提です(AltStore 等のサイドロード配布では審査・収益化ができません)。公開後に App Store Connect のリスティングと AdMob アプリの紐づけ・`app-ads.txt` の確認クロールを完了させてください。
 
 ## 今後の拡張アイデア
 
