@@ -131,6 +131,8 @@ cd backend
 
 発行したリンクは **アプリ内の「はじめてガイド」にも埋め込まれています**(`ios/PhotoUploader/AppLinks.swift` の `backendQuickCreateURL`)。テンプレートを別のバケット/リージョンに公開し直した場合は、この URL も更新してください。
 
+> **バックアップ経路(単一障害点対策):** 同じテンプレートを GitHub Pages でも配信しています(`docs/template-quickcreate.yaml`)。万一クイック作成リンクの S3 バケットが利用できなくなった場合は、Pages からテンプレートをダウンロードし、AWS コンソールの CloudFormation → スタックの作成 → 「テンプレートファイルのアップロード」で同じバックエンドを構築できます(クイック作成リンクの templateURL に指定できるのは S3 上のファイルのみ、という CloudFormation の制約のため、Pages 版は直接リンクではなくダウンロード用です)。CI が backend 側と docs 側の同期をチェックします。
+
 ### 利用者がやること(git・コマンド不要)
 
 1. [AWS アカウントを作成](https://aws.amazon.com/jp/register-flow/)(無料。クレジットカード登録が必要)

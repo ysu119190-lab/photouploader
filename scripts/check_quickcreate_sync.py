@@ -38,6 +38,20 @@ def main():
         )
     print("quick-create template InlineCode is in sync with app.py")
 
+    # docs/ copy is served by GitHub Pages as a durable fallback in case the
+    # distributor's S3 bucket (the quick-create link's source) disappears.
+    with open("backend/template-quickcreate.yaml") as f:
+        canonical = f.read()
+    with open("docs/template-quickcreate.yaml") as f:
+        pages_copy = f.read()
+    if canonical != pages_copy:
+        sys.exit(
+            "docs/template-quickcreate.yaml が backend/template-quickcreate.yaml "
+            "と一致していません。backend 側を変更したら docs 側へコピーしてください"
+            "(cp backend/template-quickcreate.yaml docs/)。"
+        )
+    print("docs/ copy of the quick-create template is in sync")
+
 
 if __name__ == "__main__":
     main()
