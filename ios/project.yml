@@ -36,7 +36,7 @@ targets:
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         ITSAppUsesNonExemptEncryption: false
-        NSCameraUsageDescription: 設定用QRコードの読み取りにカメラを使用します
+        NSCameraUsageDescription: 設定用QRコードの読み取りと、撮影した写真をそのままバックアップするためにカメラを使用します
         NSPhotoLibraryAddUsageDescription: バックアップ済みの写真や動画を写真アプリに保存(復元)するために使用します
         NSPhotoLibraryUsageDescription: まだバックアップしていない写真・動画を探してまとめてアップロードするために写真ライブラリを使用します
         # AdMob: Google's official TEST application ID. Replace with your own

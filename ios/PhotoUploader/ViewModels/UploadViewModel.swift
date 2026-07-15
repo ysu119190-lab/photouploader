@@ -15,6 +15,12 @@ final class UploadViewModel: ObservableObject {
     /// Finished batches, newest first, persisted across launches.
     @Published private(set) var history: [UploadBatchSummary] = UploadHistoryStore.load()
 
+    init() {
+        // Restore the last batch's rows so a relaunch doesn't blank the
+        // screen; rows that were mid-flight come back as "interrupted".
+        items = UploadItemsSnapshotStore.load().map(UploadItem.init(restoring:))
+    }
+
     var doneCount: Int {
         items.filter { if case .done = $0.status { return true } else { return false } }.count
     }
@@ -107,14 +113,27 @@ final class UploadViewModel: ObservableObject {
         await runBatch(queue)
     }
 
+    /// Uploads one photo taken with the in-app camera. Camera shots skip the
+    /// rewarded ad (a per-shot ad would make the capture flow unusable) and
+    /// the dedup store (they are not library assets).
+    func handleCapturedImage(_ image: UIImage) async {
+        guard !isUploading else { return }
+        items = []
+        let item = UploadItem(displayName: "撮影した写真")
+        items.append(item)
+        await runBatch([(.captured(image), item.id)])
+    }
+
     private enum BatchSource {
         case picker(PhotosPickerItem)
         case asset(PHAsset)
+        case captured(UIImage)
     }
 
     private func runBatch(_ queue: [(source: BatchSource, itemID: UUID)]) async {
         isUploading = true
         let startedAt = Date()
+        persistItems()
 
         // Keep the screen awake while the batch runs so the user can watch
         // progress; transfers themselves survive lock/background regardless.
@@ -145,6 +164,7 @@ final class UploadViewModel: ObservableObject {
                 )
             )
             history = UploadHistoryStore.load()
+            persistItems()
         }
 
         await withTaskGroup(of: Void.self) { group in
@@ -166,6 +186,28 @@ final class UploadViewModel: ObservableObject {
             await upload(pickerItem, itemID: itemID)
         case .asset(let asset):
             await upload(asset, itemID: itemID)
+        case .captured(let image):
+            await upload(capturedImage: image, itemID: itemID)
+        }
+    }
+
+    private func upload(capturedImage image: UIImage, itemID: UUID) async {
+        do {
+            guard let data = image.jpegData(compressionQuality: 0.9) else {
+                update(itemID) { $0.status = .failed(message: "撮影した写真を変換できませんでした") }
+                return
+            }
+            let thumbnail = await Self.makeThumbnail(from: data)
+            update(itemID) { $0.thumbnail = thumbnail }
+            let fileURL = try await Self.writeTemporaryFile(data: data)
+            try await startBackgroundUpload(
+                fileURL: fileURL,
+                contentType: "image/jpeg",
+                album: nil,
+                itemID: itemID
+            )
+        } catch {
+            update(itemID) { $0.status = .failed(message: error.localizedDescription) }
         }
     }
 
@@ -409,7 +451,16 @@ final class UploadViewModel: ObservableObject {
 
     private func update(_ id: UUID, _ mutate: (inout UploadItem) -> Void) {
         guard let index = items.firstIndex(where: { $0.id == id }) else { return }
+        let kindBefore = items[index].persisted.kind
         mutate(&items[index])
+        // Persist on state transitions only — not on every progress tick.
+        if items[index].persisted.kind != kindBefore {
+            persistItems()
+        }
+    }
+
+    private func persistItems() {
+        UploadItemsSnapshotStore.save(items.map(\.persisted))
     }
 
     /// Runs off the main actor: image decode / re-encode can be slow for large photos.

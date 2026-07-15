@@ -5,6 +5,22 @@ Description: >
   and a Lambda (behind a JWT-protected API Gateway HTTP API) that issues
   presigned PUT URLs so the iOS app never holds AWS credentials.
 
+Parameters:
+  # (任意) Cognito の確認メールを Amazon SES 経由で送るための、検証済み
+  # SES ID(メールアドレスまたはドメイン)の ARN。空のままなら Cognito の
+  # 標準送信(1アカウント1日50通・検証用)を使う。多人数で同じスタックを
+  # 共有する場合のみ設定すればよい。
+  # 例: arn:aws:ses:ap-northeast-1:123456789012:identity/you@example.com
+  CognitoSesSourceArn:
+    Type: String
+    Default: ""
+    Description: >-
+      (Optional) ARN of a verified SES identity for Cognito verification
+      emails. Leave empty to use Cognito's default sender (50 emails/day).
+
+Conditions:
+  UseSesForCognitoEmail: !Not [!Equals [!Ref CognitoSesSourceArn, ""]]
+
 Globals:
   Function:
     Runtime: python3.12
@@ -28,6 +44,11 @@ Resources:
   UserPool:
     Type: AWS::Cognito::UserPool
     Properties:
+      EmailConfiguration: !If
+        - UseSesForCognitoEmail
+        - EmailSendingAccount: DEVELOPER
+          SourceArn: !Ref CognitoSesSourceArn
+        - !Ref AWS::NoValue
       UsernameAttributes:
         - email
       AutoVerifiedAttributes:

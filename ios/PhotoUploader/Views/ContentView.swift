@@ -10,6 +10,7 @@ struct ContentView: View {
     @State private var isDeletingAccount = false
     @State private var accountDeletionError: String?
     @State private var isShowingLibraryPicker = false
+    @State private var isShowingCamera = false
 
     var body: some View {
         ZStack {
@@ -64,6 +65,13 @@ struct ContentView: View {
                             isShowingLibraryPicker = true
                         } label: {
                             Label("ライブラリから選ぶ(アップ済み表示)", systemImage: "photo.stack")
+                        }
+                        if CameraCaptureView.isCameraAvailable {
+                            Button {
+                                isShowingCamera = true
+                            } label: {
+                                Label("カメラで撮ってバックアップ", systemImage: "camera")
+                            }
                         }
                     } footer: {
                         Text("「新着をまとめてバックアップ」は、まだバックアップしていない写真・動画を自動で探してアップロードします。アルバム分けも保存先に反映されます(初回は写真へのアクセス許可が必要)")
@@ -167,6 +175,14 @@ struct ContentView: View {
                         await viewModel.handleAssets(assets)
                     }
                 }
+            }
+            .fullScreenCover(isPresented: $isShowingCamera) {
+                CameraCaptureView { image in
+                    Task {
+                        await viewModel.handleCapturedImage(image)
+                    }
+                }
+                .ignoresSafeArea()
             }
             .safeAreaInset(edge: .bottom) {
                 BannerAdView()
@@ -346,6 +362,10 @@ private struct UploadRow: View {
             Text(message)
                 .font(.caption)
                 .foregroundStyle(.red)
+        case .interrupted:
+            Text("アプリ再起動により中断(転送は完了している場合があります。「保存済み」タブで確認できます)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -366,6 +386,9 @@ private struct UploadRow: View {
         case .failed:
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.red)
+        case .interrupted:
+            Image(systemName: "questionmark.circle")
+                .foregroundStyle(.secondary)
         }
     }
 }

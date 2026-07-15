@@ -101,6 +101,7 @@ final class SessionStore: ObservableObject {
         await TokenProvider.shared.signOut()
         UploadHistoryStore.clear()
         UploadedAssetsStore.clear()
+        UploadItemsSnapshotStore.clear()
         state = .signedOut
     }
 }
