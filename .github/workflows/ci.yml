@@ -1,9 +1,17 @@
 name: CI
 
 on:
+  # PR 単位で実行する(ブランチへの push では起動しない)。main への push は
+  # マージ後の検証と、配布用 .ipa Artifact の取得元として残す。
   push:
-    branches: [main, "claude/**"]
+    branches: [main]
   pull_request:
+
+# 同じ PR に連続 push したら古い実行をキャンセルして最新だけ走らせる。
+# main への push はキャンセルしない(マージごとの成果物を確実に残す)。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   backend-lint:

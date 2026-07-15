@@ -7,7 +7,7 @@ struct BannerAdView: UIViewRepresentable {
         let banner = GADBannerView(adSize: GADAdSizeBanner)
         banner.adUnitID = AdsConfig.bannerAdUnitID
         banner.rootViewController = Self.rootViewController
-        banner.load(GADRequest())
+        banner.load(AdsConfig.makeRequest())
         return banner
     }
 

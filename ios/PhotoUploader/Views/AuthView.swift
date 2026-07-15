@@ -93,7 +93,7 @@ struct AuthView: View {
                 .textContentType(mode == .signUp ? .newPassword : .password)
         } footer: {
             if mode == .signUp {
-                Text("登録したメールアドレスに確認コードが届きます")
+                Text("登録したメールアドレスに確認コードが届きます(届かない場合は迷惑メールフォルダもご確認ください)")
             }
         }
 
@@ -189,7 +189,7 @@ struct AuthView: View {
         } header: {
             Text("新しいパスワードの設定")
         } footer: {
-            Text("\(resetEmail) 宛てに送信された6桁のコードを入力してください")
+            Text("\(resetEmail) 宛てに送信された6桁のコードを入力してください。届かない場合は迷惑メールフォルダもご確認ください")
         }
 
         Section {
@@ -226,7 +226,7 @@ struct AuthView: View {
         } header: {
             Text("メールの確認")
         } footer: {
-            Text("\(pendingEmail) 宛てに送信された6桁のコードを入力してください")
+            Text("\(pendingEmail) 宛てに送信された6桁のコードを入力してください。数分待っても届かない場合は、迷惑メールフォルダを確認してください(差出人: no-reply@verificationemail.com)")
         }
 
         Section {

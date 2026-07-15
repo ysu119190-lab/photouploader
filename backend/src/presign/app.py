@@ -1,6 +1,6 @@
 """Lambda handling the app's API. Two routes, both JWT-protected:
 
-POST /presign  — issue a presigned S3 PUT URL for uploading one photo
+POST /presign  — issue a presigned S3 PUT URL for uploading one photo/video
 GET  /photos   — list the caller's uploaded photos with presigned GET URLs
 
 The API Gateway JWT authorizer (Cognito) has already validated the caller's
@@ -35,6 +35,9 @@ ALLOWED_CONTENT_TYPES = {
     "image/heif": ".heif",
     "image/webp": ".webp",
     "image/gif": ".gif",
+    "video/mp4": ".mp4",
+    "video/quicktime": ".mov",
+    "video/x-m4v": ".m4v",
 }
 
 # S3 storage classes the app may request. STANDARD is the default (frequent

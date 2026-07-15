@@ -6,6 +6,9 @@ struct ContentView: View {
     @StateObject private var viewModel = UploadViewModel()
     @State private var selection: [PhotosPickerItem] = []
     @State private var isShowingSplash = true
+    @State private var isConfirmingAccountDeletion = false
+    @State private var isDeletingAccount = false
+    @State private var accountDeletionError: String?
 
     var body: some View {
         ZStack {
@@ -88,17 +91,22 @@ struct ContentView: View {
                     ContentUnavailableView(
                         "写真がありません",
                         systemImage: "photo.on.rectangle.angled",
-                        description: Text("右上のボタンから写真を選ぶとS3にアップロードします")
+                        description: Text("右上のボタンから写真や動画を選ぶとS3にアップロードします")
                     )
                 }
             }
             .navigationTitle("Photo Uploader")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("ログアウト") {
-                        Task { await session.signOut() }
+                    Menu("アカウント") {
+                        Button("ログアウト") {
+                            Task { await session.signOut() }
+                        }
+                        Button("アカウントを削除", role: .destructive) {
+                            isConfirmingAccountDeletion = true
+                        }
                     }
-                    .disabled(viewModel.isUploading)
+                    .disabled(viewModel.isUploading || isDeletingAccount)
                 }
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     NavigationLink {
@@ -111,10 +119,10 @@ struct ContentView: View {
                     PhotosPicker(
                         selection: $selection,
                         maxSelectionCount: nil,
-                        matching: .images,
+                        matching: .any(of: [.images, .videos]),
                         photoLibrary: .shared()
                     ) {
-                        Label("写真を選択", systemImage: "photo.badge.plus")
+                        Label("写真・動画を選択", systemImage: "photo.badge.plus")
                     }
                     .disabled(viewModel.isUploading)
                 }
@@ -135,6 +143,44 @@ struct ContentView: View {
                     .frame(width: 320, height: 50)
                     .frame(maxWidth: .infinity)
                     .background(.bar)
+            }
+            .confirmationDialog(
+                "アカウントを削除しますか?",
+                isPresented: $isConfirmingAccountDeletion,
+                titleVisibility: .visible
+            ) {
+                Button("アカウントを完全に削除する", role: .destructive) {
+                    deleteAccount()
+                }
+                Button("キャンセル", role: .cancel) {}
+            } message: {
+                Text("ログイン用アカウント(メールアドレス登録)を完全に削除します。この操作は取り消せません。S3にバックアップ済みの写真は削除されず、あなたのAWS環境にそのまま残ります。")
+            }
+            .alert(
+                "アカウントを削除できませんでした",
+                isPresented: Binding(
+                    get: { accountDeletionError != nil },
+                    set: { if !$0 { accountDeletionError = nil } }
+                )
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(accountDeletionError ?? "")
+            }
+        }
+    }
+
+    private func deleteAccount() {
+        isDeletingAccount = true
+        Task { @MainActor in
+            defer { isDeletingAccount = false }
+            do {
+                try await session.deleteAccount()
+                // The store was cleared; reset the in-memory list too so a
+                // future account on this device starts with an empty screen.
+                viewModel.clearHistory()
+            } catch {
+                accountDeletionError = error.localizedDescription
             }
         }
     }
@@ -197,7 +243,7 @@ private struct HistoryRow: View {
     }
 
     private var summaryText: String {
-        var parts = ["\(batch.total)枚中\(batch.done)枚アップロード"]
+        var parts = ["\(batch.total)件中\(batch.done)件アップロード"]
         if batch.skipped > 0 { parts.append("スキップ\(batch.skipped)") }
         if batch.failed > 0 { parts.append("失敗\(batch.failed)") }
         return parts.joined(separator: "・")

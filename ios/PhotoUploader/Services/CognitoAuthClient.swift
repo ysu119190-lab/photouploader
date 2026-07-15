@@ -2,6 +2,8 @@ import Foundation
 
 struct AuthTokens {
     let idToken: String
+    /// Needed for user-self-service operations like DeleteUser.
+    let accessToken: String
     let refreshToken: String
     let expiresIn: Int
 }
@@ -144,18 +146,36 @@ enum CognitoAuthClient {
         return try parseTokens(from: result, existingRefreshToken: refreshToken)
     }
 
+    /// Permanently deletes the signed-in user from the user pool. Requires a
+    /// valid access token (not the ID token). Photos already uploaded to S3
+    /// are not touched — they live in the user's own AWS account.
+    static func deleteUser(accessToken: String) async throws {
+        let config = try BackendConfigStore.required()
+        _ = try await call(
+            target: "DeleteUser",
+            region: config.region,
+            payload: ["AccessToken": accessToken]
+        )
+    }
+
     private static func parseTokens(
         from result: [String: Any],
         existingRefreshToken: String?
     ) throws -> AuthTokens {
         guard let auth = result["AuthenticationResult"] as? [String: Any],
               let idToken = auth["IdToken"] as? String,
+              let accessToken = auth["AccessToken"] as? String,
               let expiresIn = auth["ExpiresIn"] as? Int,
               let refreshToken = (auth["RefreshToken"] as? String) ?? existingRefreshToken
         else {
             throw AuthError.unexpectedResponse
         }
-        return AuthTokens(idToken: idToken, refreshToken: refreshToken, expiresIn: expiresIn)
+        return AuthTokens(
+            idToken: idToken,
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+            expiresIn: expiresIn
+        )
     }
 
     private static func call(

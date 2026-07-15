@@ -18,7 +18,7 @@ final class RewardedAdController: NSObject {
         isLoading = true
         GADRewardedAd.load(
             withAdUnitID: AdsConfig.rewardedAdUnitID,
-            request: GADRequest()
+            request: AdsConfig.makeRequest()
         ) { [weak self] ad, _ in
             guard let self else { return }
             self.isLoading = false

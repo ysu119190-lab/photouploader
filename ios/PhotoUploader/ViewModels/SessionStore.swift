@@ -83,4 +83,24 @@ final class SessionStore: ObservableObject {
         await TokenProvider.shared.signOut()
         state = .signedOut
     }
+
+    /// Permanently deletes the Cognito account (App Store guideline 5.1.1(v)
+    /// requires in-app account deletion). Local per-account records are
+    /// cleared too; photos already in the user's own S3 bucket are untouched.
+    func deleteAccount() async throws {
+        do {
+            let accessToken = try await TokenProvider.shared.validAccessToken()
+            try await CognitoAuthClient.deleteUser(accessToken: accessToken)
+        } catch let error as CognitoError where error.type == "NotAuthorizedException" {
+            // Token revoked mid-flight — the session is unusable either way,
+            // so fall through to the local sign-out and surface the error.
+            await TokenProvider.shared.signOut()
+            state = .signedOut
+            throw error
+        }
+        await TokenProvider.shared.signOut()
+        UploadHistoryStore.clear()
+        UploadedAssetsStore.clear()
+        state = .signedOut
+    }
 }

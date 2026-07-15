@@ -1,3 +1,4 @@
+import AVFoundation
 import PhotosUI
 import SwiftUI
 import UIKit
@@ -27,9 +28,15 @@ final class UploadViewModel: ObservableObject {
     /// this speeds up large batches but increases memory and network pressure.
     private let maxConcurrentUploads = 4
 
-    /// MIME types the backend accepts as-is; anything else is re-encoded to JPEG.
+    /// Image MIME types the backend accepts as-is; other images are re-encoded to JPEG.
     private static let supportedMimeTypes: Set<String> = [
         "image/jpeg", "image/png", "image/heic", "image/heif", "image/webp", "image/gif",
+    ]
+
+    /// Video MIME types the backend accepts. Unlike images there is no
+    /// re-encode fallback — transcoding video on device is too slow.
+    private static let supportedVideoMimeTypes: Set<String> = [
+        "video/mp4", "video/quicktime", "video/x-m4v",
     ]
 
     /// Uploads the picked photos as one batch, at most `maxConcurrentUploads`
@@ -75,7 +82,8 @@ final class UploadViewModel: ObservableObject {
 
         var queue: [(pickerItem: PhotosPickerItem, itemID: UUID)] = []
         for pickerItem in pickerItems {
-            let item = UploadItem(displayName: "写真 \(items.count + 1)")
+            let kind = Self.isVideo(pickerItem) ? "動画" : "写真"
+            let item = UploadItem(displayName: "\(kind) \(items.count + 1)")
             items.append(item)
             queue.append((pickerItem, item.id))
         }
@@ -99,9 +107,14 @@ final class UploadViewModel: ObservableObject {
     }
 
     private func upload(_ pickerItem: PhotosPickerItem, itemID: UUID) async {
-        // Photos already uploaded in a previous batch are skipped, not resent.
+        // Items already uploaded in a previous batch are skipped, not resent.
         if let assetID = pickerItem.itemIdentifier, UploadedAssetsStore.contains(assetID) {
             update(itemID) { $0.status = .skipped }
+            return
+        }
+
+        if Self.isVideo(pickerItem) {
+            await uploadVideo(pickerItem, itemID: itemID)
             return
         }
 
@@ -150,6 +163,50 @@ final class UploadViewModel: ObservableObject {
         }
     }
 
+    /// Videos are staged as files (never loaded into memory whole) and are
+    /// uploaded as-is — no re-encode fallback like images have.
+    private func uploadVideo(_ pickerItem: PhotosPickerItem, itemID: UUID) async {
+        do {
+            guard let movie = try await pickerItem.loadTransferable(type: PickedMovie.self) else {
+                update(itemID) { $0.status = .failed(message: "動画を読み込めませんでした") }
+                return
+            }
+
+            let contentType = pickerItem.supportedContentTypes
+                .first { $0.conforms(to: .movie) }?
+                .preferredMIMEType ?? "video/quicktime"
+            guard Self.supportedVideoMimeTypes.contains(contentType) else {
+                update(itemID) { $0.status = .failed(message: "対応していない動画形式です") }
+                return
+            }
+
+            let thumbnail = await Self.makeVideoThumbnail(for: movie.url)
+            update(itemID) { $0.thumbnail = thumbnail }
+            update(itemID) { $0.status = .uploading(progress: 0) }
+
+            let key = try await BackgroundUploadManager.shared.upload(
+                fileURL: movie.url,
+                contentType: contentType,
+                storageClass: StorageModeStore.current.rawValue
+            ) { progress in
+                Task { @MainActor [weak self] in
+                    self?.update(itemID) { $0.status = .uploading(progress: progress) }
+                }
+            }
+
+            update(itemID) { $0.status = .done(key: key) }
+            if let assetID = pickerItem.itemIdentifier {
+                UploadedAssetsStore.insert(assetID)
+            }
+        } catch {
+            update(itemID) { $0.status = .failed(message: error.localizedDescription) }
+        }
+    }
+
+    nonisolated private static func isVideo(_ pickerItem: PhotosPickerItem) -> Bool {
+        pickerItem.supportedContentTypes.contains { $0.conforms(to: .movie) }
+    }
+
     private func update(_ id: UUID, _ mutate: (inout UploadItem) -> Void) {
         guard let index = items.firstIndex(where: { $0.id == id }) else { return }
         mutate(&items[index])
@@ -174,6 +231,17 @@ final class UploadViewModel: ObservableObject {
         UIImage(data: data)?.preparingThumbnail(of: CGSize(width: 120, height: 120))
     }
 
+    /// Grabs the first frame of a staged video file for the list thumbnail.
+    nonisolated private static func makeVideoThumbnail(for url: URL) async -> UIImage? {
+        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 240, height: 240)
+        guard let cgImage = try? await generator.image(at: .zero).image else {
+            return nil
+        }
+        return UIImage(cgImage: cgImage)
+    }
+
     /// Runs off the main actor: stages the photo bytes for the background session.
     nonisolated private static func writeTemporaryFile(data: Data) async throws -> URL {
         let directory = FileManager.default.temporaryDirectory
@@ -182,5 +250,26 @@ final class UploadViewModel: ObservableObject {
         let fileURL = directory.appendingPathComponent(UUID().uuidString)
         try data.write(to: fileURL)
         return fileURL
+    }
+}
+
+/// Receives a picked video as a staged file copy. Videos can be hundreds of
+/// megabytes, so they must never be loaded into memory the way photos are.
+private struct PickedMovie: Transferable {
+    let url: URL
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(importedContentType: .movie) { received in
+            let directory = FileManager.default.temporaryDirectory
+                .appendingPathComponent("pending-uploads", isDirectory: true)
+            try FileManager.default.createDirectory(
+                at: directory,
+                withIntermediateDirectories: true
+            )
+            let ext = received.file.pathExtension.isEmpty ? "mov" : received.file.pathExtension
+            let destination = directory.appendingPathComponent("\(UUID().uuidString).\(ext)")
+            try FileManager.default.copyItem(at: received.file, to: destination)
+            return Self(url: destination)
+        }
     }
 }
