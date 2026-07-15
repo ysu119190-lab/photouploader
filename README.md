@@ -36,13 +36,19 @@ iPhone アプリ                     AWS
 
 ```
 backend/               AWS SAM(Cognito + S3 バケット + Lambda + API Gateway)
-  template.yaml
-  src/presign/app.py   署名付きURLを発行する Lambda
+  template.yaml            開発者向けテンプレート
+  template-quickcreate.yaml  ワンクリック構築用の単一ファイル版(Lambdaをインライン)
+  src/presign/app.py       APIのLambda(presign / 一覧 / 削除)
+  tests/                   Lambdaのユニットテスト(pytest・CIで実行)
 ios/                   iOS アプリ(XcodeGen で .xcodeproj を生成)
   project.yml
-  PhotoUploader/       SwiftUI ソース一式
-  PhotoUploaderUITests/  シミュレータ用 UI テスト(CI でスクリーンショット取得)
-.github/workflows/     CI(lint / シミュレータ UI テスト / .ipa 生成)
+  PhotoUploader/           SwiftUI ソース一式
+  PhotoUploaderTests/      モデルロジックのユニットテスト
+  PhotoUploaderUITests/    シミュレータ用 UI テスト(CI でスクリーンショット取得)
+docs/                  GitHub Pages(LP・プライバシーポリシー・app-ads.txt・テンプレート控え)
+notes/                 プロジェクトノート・審査/ストア素材・記事下書き
+scripts/               CI補助(テンプレート同期チェック)
+.github/workflows/     CI(lint+pytest / シミュレータテスト / .ipa 生成)+ TestFlight配信(下書き)
 ```
 
 ## セットアップ手順
