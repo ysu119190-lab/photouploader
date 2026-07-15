@@ -9,13 +9,11 @@ struct PresignResponse: Decodable {
     let storageClass: String?
     /// Piggybacked PUT URL for the JPEG thumbnail (when requested).
     let thumbnailUploadUrl: String?
-    let thumbnailKey: String?
 }
 
 /// Response of the thumbnail-only re-sign (`thumbnailFor` request).
 struct ThumbnailPresignResponse: Decodable {
     let thumbnailUploadUrl: String
-    let thumbnailKey: String
 }
 
 enum UploadError: LocalizedError {

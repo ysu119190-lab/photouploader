@@ -14,8 +14,6 @@ final class GalleryViewModel: ObservableObject {
     private var nextOffset: Int?
     private var hasLoadedOnce = false
 
-    var canLoadMore: Bool { nextOffset != nil }
-
     /// Initial load; no-op when already loaded (call refresh() to reload).
     func loadIfNeeded() async {
         guard !hasLoadedOnce else { return }

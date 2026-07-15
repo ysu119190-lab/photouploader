@@ -15,6 +15,7 @@ final class UploadViewModel: ObservableObject {
     @Published var infoMessage: String?
     /// Sources of the current batch, kept so failed items can be retried.
     private var batchSources: [UUID: BatchSource] = [:]
+    private static var didRequestNotificationAuth = false
     /// Finished batches, newest first, persisted across launches.
     @Published private(set) var history: [UploadBatchSummary] = UploadHistoryStore.load()
 
@@ -169,10 +170,14 @@ final class UploadViewModel: ObservableObject {
             )
         }
         persistItems()
-        // First batch triggers the notification permission prompt; later
-        // batches are a no-op. Denial just means no completion notification.
-        _ = try? await UNUserNotificationCenter.current()
-            .requestAuthorization(options: [.alert, .sound])
+        // The first batch of the launch triggers the notification permission
+        // prompt (a no-op once answered). Denial just means no completion
+        // notification.
+        if !Self.didRequestNotificationAuth {
+            Self.didRequestNotificationAuth = true
+            _ = try? await UNUserNotificationCenter.current()
+                .requestAuthorization(options: [.alert, .sound])
+        }
 
         // Keep the screen awake while the batch runs so the user can watch
         // progress; transfers themselves survive lock/background regardless.
@@ -232,24 +237,17 @@ final class UploadViewModel: ObservableObject {
     }
 
     private func upload(capturedImage image: UIImage, itemID: UUID) async {
-        do {
-            guard let data = image.jpegData(compressionQuality: 0.9) else {
-                update(itemID) { $0.status = .failed(message: "撮影した写真を変換できませんでした") }
-                return
-            }
-            let thumbnail = await Self.makeThumbnail(from: data)
-            update(itemID) { $0.thumbnail = thumbnail }
-            let fileURL = try await Self.writeTemporaryFile(data: data)
-            try await startBackgroundUpload(
-                fileURL: fileURL,
-                contentType: "image/jpeg",
-                album: nil,
-                itemID: itemID,
-                thumbnailData: await Self.makeThumbnailData(fromImageData: data)
-            )
-        } catch {
-            update(itemID) { $0.status = .failed(message: error.localizedDescription) }
+        guard let data = image.jpegData(compressionQuality: 0.9) else {
+            update(itemID) { $0.status = .failed(message: "撮影した写真を変換できませんでした") }
+            return
         }
+        await uploadImage(
+            rawData: data,
+            rawContentType: "image/jpeg",
+            album: nil,
+            itemID: itemID,
+            dedupID: nil
+        )
     }
 
     func clearHistory() {
@@ -264,79 +262,37 @@ final class UploadViewModel: ObservableObject {
             return
         }
 
-        if Self.isVideo(pickerItem) {
-            await uploadVideo(pickerItem, itemID: itemID)
-            return
-        }
-
         do {
-            guard let rawData = try await pickerItem.loadTransferable(type: Data.self) else {
-                update(itemID) { $0.status = .failed(message: "写真を読み込めませんでした") }
-                return
-            }
-
-            let rawContentType = pickerItem.supportedContentTypes
-                .compactMap(\.preferredMIMEType)
-                .first ?? "image/jpeg"
-
-            let thumbnail = await Self.makeThumbnail(from: rawData)
-            update(itemID) { $0.thumbnail = thumbnail }
-
-            guard let (data, contentType) = await Self.prepareForUpload(
-                data: rawData,
-                contentType: rawContentType
-            ) else {
-                update(itemID) { $0.status = .failed(message: "対応していない画像形式です") }
-                return
-            }
-
-            // Background sessions upload from files, not memory.
-            let fileURL = try await Self.writeTemporaryFile(data: data)
-
-            try await startBackgroundUpload(
-                fileURL: fileURL,
-                contentType: contentType,
-                album: nil,
-                itemID: itemID,
-                thumbnailData: await Self.makeThumbnailData(fromImageData: rawData)
-            )
-            if let assetID = pickerItem.itemIdentifier {
-                UploadedAssetsStore.insert(assetID)
-            }
-        } catch {
-            update(itemID) { $0.status = .failed(message: error.localizedDescription) }
-        }
-    }
-
-    /// Videos are staged as files (never loaded into memory whole) and are
-    /// uploaded as-is — no re-encode fallback like images have.
-    private func uploadVideo(_ pickerItem: PhotosPickerItem, itemID: UUID) async {
-        do {
-            guard let movie = try await pickerItem.loadTransferable(type: PickedMovie.self) else {
-                update(itemID) { $0.status = .failed(message: "動画を読み込めませんでした") }
-                return
-            }
-
-            let contentType = pickerItem.supportedContentTypes
-                .first { $0.conforms(to: .movie) }?
-                .preferredMIMEType ?? "video/quicktime"
-            guard Self.supportedVideoMimeTypes.contains(contentType) else {
-                update(itemID) { $0.status = .failed(message: "対応していない動画形式です") }
-                return
-            }
-
-            let thumbnail = await Self.makeVideoThumbnail(for: movie.url)
-            update(itemID) { $0.thumbnail = thumbnail }
-
-            try await startBackgroundUpload(
-                fileURL: movie.url,
-                contentType: contentType,
-                album: nil,
-                itemID: itemID,
-                thumbnailData: thumbnail?.jpegData(compressionQuality: 0.7)
-            )
-            if let assetID = pickerItem.itemIdentifier {
-                UploadedAssetsStore.insert(assetID)
+            if Self.isVideo(pickerItem) {
+                guard let movie = try await pickerItem.loadTransferable(type: PickedMovie.self) else {
+                    update(itemID) { $0.status = .failed(message: "動画を読み込めませんでした") }
+                    return
+                }
+                let contentType = pickerItem.supportedContentTypes
+                    .first { $0.conforms(to: .movie) }?
+                    .preferredMIMEType ?? "video/quicktime"
+                await uploadVideoFile(
+                    fileURL: movie.url,
+                    contentType: contentType,
+                    album: nil,
+                    itemID: itemID,
+                    dedupID: pickerItem.itemIdentifier
+                )
+            } else {
+                guard let rawData = try await pickerItem.loadTransferable(type: Data.self) else {
+                    update(itemID) { $0.status = .failed(message: "写真を読み込めませんでした") }
+                    return
+                }
+                let rawContentType = pickerItem.supportedContentTypes
+                    .compactMap(\.preferredMIMEType)
+                    .first ?? "image/jpeg"
+                await uploadImage(
+                    rawData: rawData,
+                    rawContentType: rawContentType,
+                    album: nil,
+                    itemID: itemID,
+                    dedupID: pickerItem.itemIdentifier
+                )
             }
         } catch {
             update(itemID) { $0.status = .failed(message: error.localizedDescription) }
@@ -352,45 +308,98 @@ final class UploadViewModel: ObservableObject {
     private func upload(_ asset: PHAsset, itemID: UUID) async {
         do {
             let album = Self.albumName(for: asset)
-
             if asset.mediaType == .video {
                 let (fileURL, contentType) = try await Self.exportVideo(asset)
-                guard Self.supportedVideoMimeTypes.contains(contentType) else {
-                    try? FileManager.default.removeItem(at: fileURL)
-                    update(itemID) { $0.status = .failed(message: "対応していない動画形式です") }
-                    return
-                }
-                let thumbnail = await Self.makeVideoThumbnail(for: fileURL)
-                update(itemID) { $0.thumbnail = thumbnail }
-                try await startBackgroundUpload(
+                await uploadVideoFile(
                     fileURL: fileURL,
                     contentType: contentType,
                     album: album,
                     itemID: itemID,
-                    thumbnailData: thumbnail?.jpegData(compressionQuality: 0.7)
+                    dedupID: asset.localIdentifier
                 )
             } else {
                 let (rawData, rawContentType) = try await Self.exportImageData(asset)
-                let thumbnail = await Self.makeThumbnail(from: rawData)
-                update(itemID) { $0.thumbnail = thumbnail }
-                guard let (data, contentType) = await Self.prepareForUpload(
-                    data: rawData,
-                    contentType: rawContentType
-                ) else {
-                    update(itemID) { $0.status = .failed(message: "対応していない画像形式です") }
-                    return
-                }
-                let fileURL = try await Self.writeTemporaryFile(data: data)
-                try await startBackgroundUpload(
-                    fileURL: fileURL,
-                    contentType: contentType,
+                await uploadImage(
+                    rawData: rawData,
+                    rawContentType: rawContentType,
                     album: album,
                     itemID: itemID,
-                    thumbnailData: await Self.makeThumbnailData(fromImageData: rawData)
+                    dedupID: asset.localIdentifier
                 )
             }
+        } catch {
+            update(itemID) { $0.status = .failed(message: error.localizedDescription) }
+        }
+    }
 
-            UploadedAssetsStore.insert(asset.localIdentifier)
+    /// Shared image tail for every source (picker, library asset, camera):
+    /// list thumbnail → re-encode if needed → stage → background upload →
+    /// dedup record.
+    private func uploadImage(
+        rawData: Data,
+        rawContentType: String,
+        album: String?,
+        itemID: UUID,
+        dedupID: String?
+    ) async {
+        do {
+            let thumbnail = await Self.makeThumbnail(from: rawData)
+            update(itemID) { $0.thumbnail = thumbnail }
+
+            guard let (data, contentType) = await Self.prepareForUpload(
+                data: rawData,
+                contentType: rawContentType
+            ) else {
+                update(itemID) { $0.status = .failed(message: "対応していない画像形式です") }
+                return
+            }
+
+            // Background sessions upload from files, not memory.
+            let fileURL = try await Self.writeTemporaryFile(data: data)
+            try await startBackgroundUpload(
+                fileURL: fileURL,
+                contentType: contentType,
+                album: album,
+                itemID: itemID,
+                thumbnailData: await Self.makeThumbnailData(fromImageData: rawData)
+            )
+            if let dedupID {
+                UploadedAssetsStore.insert(dedupID)
+            }
+        } catch {
+            update(itemID) { $0.status = .failed(message: error.localizedDescription) }
+        }
+    }
+
+    /// Shared video tail: videos upload as-is (no re-encode fallback —
+    /// transcoding on device is too slow), so unsupported types fail early.
+    private func uploadVideoFile(
+        fileURL: URL,
+        contentType: String,
+        album: String?,
+        itemID: UUID,
+        dedupID: String?
+    ) async {
+        do {
+            guard Self.supportedVideoMimeTypes.contains(contentType) else {
+                try? FileManager.default.removeItem(at: fileURL)
+                update(itemID) { $0.status = .failed(message: "対応していない動画形式です") }
+                return
+            }
+
+            let thumbnail = await Self.makeVideoThumbnail(for: fileURL)
+            update(itemID) { $0.thumbnail = thumbnail }
+
+            try await startBackgroundUpload(
+                fileURL: fileURL,
+                contentType: contentType,
+                album: album,
+                itemID: itemID,
+                thumbnailData: thumbnail?.jpegData(compressionQuality: 0.7)
+            )
+            if let dedupID {
+                UploadedAssetsStore.insert(dedupID)
+            }
         } catch {
             update(itemID) { $0.status = .failed(message: error.localizedDescription) }
         }
@@ -420,11 +429,15 @@ final class UploadViewModel: ObservableObject {
         }
         update(itemID) { $0.status = .done(key: result.key) }
         if let thumbnailData {
-            await Self.uploadThumbnail(
-                thumbnailData,
-                to: result.thumbnailUploadURL,
-                for: result.key
-            )
+            // Fire-and-forget: a ~50KB best-effort PUT shouldn't occupy one
+            // of the batch's concurrent-upload slots.
+            Task.detached(priority: .utility) {
+                await Self.uploadThumbnail(
+                    thumbnailData,
+                    to: result.thumbnailUploadURL,
+                    for: result.key
+                )
+            }
         }
     }
 
@@ -513,10 +526,8 @@ final class UploadViewModel: ObservableObject {
 
         let type = UTType(resource.uniformTypeIdentifier)
         let ext = type?.preferredFilenameExtension ?? "mov"
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("pending-uploads", isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let destination = directory.appendingPathComponent("\(UUID().uuidString).\(ext)")
+        let destination = try stagingDirectory()
+            .appendingPathComponent("\(UUID().uuidString).\(ext)")
 
         let options = PHAssetResourceRequestOptions()
         options.isNetworkAccessAllowed = true
@@ -594,13 +605,19 @@ final class UploadViewModel: ObservableObject {
 
     /// Runs off the main actor: stages the photo bytes for the background session.
     nonisolated private static func writeTemporaryFile(data: Data) async throws -> URL {
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("pending-uploads", isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let fileURL = directory.appendingPathComponent(UUID().uuidString)
+        let fileURL = try stagingDirectory().appendingPathComponent(UUID().uuidString)
         try data.write(to: fileURL)
         return fileURL
     }
+}
+
+/// Directory where photo/video bytes wait for the background session.
+/// Shared by every staging path (photo data, exported videos, picked movies).
+private func stagingDirectory() throws -> URL {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("pending-uploads", isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    return directory
 }
 
 /// Failure while reading an asset out of the photo library.
@@ -616,14 +633,9 @@ private struct PickedMovie: Transferable {
 
     static var transferRepresentation: some TransferRepresentation {
         FileRepresentation(importedContentType: .movie) { received in
-            let directory = FileManager.default.temporaryDirectory
-                .appendingPathComponent("pending-uploads", isDirectory: true)
-            try FileManager.default.createDirectory(
-                at: directory,
-                withIntermediateDirectories: true
-            )
             let ext = received.file.pathExtension.isEmpty ? "mov" : received.file.pathExtension
-            let destination = directory.appendingPathComponent("\(UUID().uuidString).\(ext)")
+            let destination = try stagingDirectory()
+                .appendingPathComponent("\(UUID().uuidString).\(ext)")
             try FileManager.default.copyItem(at: received.file, to: destination)
             return Self(url: destination)
         }

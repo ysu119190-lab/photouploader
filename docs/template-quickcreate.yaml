@@ -382,8 +382,13 @@ Resources:
             selected = objects[offset : offset + limit]
 
             # Thumbnails exist only for uploads made by newer app versions, so map
-            # which ones are actually present instead of signing blindly.
-            thumb_keys = {item["key"] for item in _list_keys(f"{THUMB_PREFIX}{user_id}/")}
+            # which ones are actually present instead of signing blindly. Skip the
+            # extra listing entirely when the requested page has no rows.
+            thumb_keys = (
+                {item["key"] for item in _list_keys(f"{THUMB_PREFIX}{user_id}/")}
+                if selected
+                else set()
+            )
 
             # Signing is local computation — no AWS calls — so per-item URLs are cheap.
             for item in selected:

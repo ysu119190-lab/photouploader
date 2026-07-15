@@ -27,15 +27,6 @@ final class ModelTests: XCTestCase {
         XCTAssertFalse(try makePhoto(key: "uploads/u/2026/07/15/a.heic").isVideo)
     }
 
-    func testAlbumNameParsing() throws {
-        XCTAssertEqual(
-            try makePhoto(key: "uploads/sub/albums/家族旅行/2026/07/15/a.jpg").albumName,
-            "家族旅行"
-        )
-        XCTAssertNil(try makePhoto(key: "uploads/sub/2026/07/15/a.jpg").albumName)
-        XCTAssertNil(try makePhoto(key: "thumbs/sub/albums/x/a.jpg").albumName)
-    }
-
     func testGridImageURLPrefersThumbnail() throws {
         let withThumb = try makePhoto(
             key: "uploads/u/a.jpg",

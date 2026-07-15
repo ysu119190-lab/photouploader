@@ -28,15 +28,6 @@ struct RemotePhoto: Decodable, Identifiable {
         return ["mp4", "mov", "m4v"].contains(ext)
     }
 
-    /// Album folder embedded in the key (uploads/<sub>/albums/<name>/...).
-    var albumName: String? {
-        let parts = key.split(separator: "/")
-        guard parts.count > 3, parts[0] == "uploads", parts[2] == "albums" else {
-            return nil
-        }
-        return String(parts[3])
-    }
-
     var uploadedAt: Date? {
         ISO8601DateFormatter().date(from: lastModified)
     }

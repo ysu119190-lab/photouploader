@@ -217,21 +217,7 @@ private struct GalleryCell: View {
                         .padding(4)
                 }
             }
-            .overlay {
-                if isSelected {
-                    Rectangle()
-                        .strokeBorder(Color.accentColor, lineWidth: 3)
-                        .background(Color.accentColor.opacity(0.25))
-                }
-            }
-            .overlay(alignment: .topTrailing) {
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .symbolRenderingMode(.palette)
-                        .foregroundStyle(.white, Color.accentColor)
-                        .padding(4)
-                }
-            }
+            .selectableCell(isSelected: isSelected)
             .clipped()
             .contentShape(Rectangle())
     }
@@ -295,10 +281,7 @@ private struct PhotoDetailView: View {
             }
             .alert(
                 "端末への保存",
-                isPresented: Binding(
-                    get: { saveResult != nil },
-                    set: { if !$0 { saveResult = nil } }
-                )
+                isPresented: Binding(isPresent: $saveResult)
             ) {
                 Button("OK", role: .cancel) {}
             } message: {

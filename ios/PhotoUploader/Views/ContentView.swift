@@ -126,10 +126,7 @@ struct ContentView: View {
             }
             .alert(
                 "バックアップ",
-                isPresented: Binding(
-                    get: { viewModel.infoMessage != nil },
-                    set: { if !$0 { viewModel.infoMessage = nil } }
-                )
+                isPresented: Binding(isPresent: $viewModel.infoMessage)
             ) {
                 Button("OK", role: .cancel) {}
             } message: {
@@ -171,19 +168,13 @@ struct ContentView: View {
                 guard !newValue.isEmpty else { return }
                 let picked = newValue
                 selection = []
-                Task {
-                    // Rewarded ad gates the upload; if none is available the
-                    // upload starts anyway (backups are never ad-blocked).
-                    _ = await RewardedAdController.shared.presentIfReady()
+                runAfterRewardedAd {
                     await viewModel.handleSelection(picked)
                 }
             }
             .sheet(isPresented: $isShowingLibraryPicker) {
                 LibraryPickerView { assets in
-                    Task {
-                        // Same ad gate as the system picker; the controller
-                        // waits for the sheet dismissal to finish first.
-                        _ = await RewardedAdController.shared.presentIfReady()
+                    runAfterRewardedAd {
                         await viewModel.handleAssets(assets)
                     }
                 }
@@ -216,15 +207,22 @@ struct ContentView: View {
             }
             .alert(
                 "アカウントを削除できませんでした",
-                isPresented: Binding(
-                    get: { accountDeletionError != nil },
-                    set: { if !$0 { accountDeletionError = nil } }
-                )
+                isPresented: Binding(isPresent: $accountDeletionError)
             ) {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(accountDeletionError ?? "")
             }
+        }
+    }
+
+    /// Rewarded ad gates every upload entry point; if no ad is available the
+    /// upload starts anyway (backups are never ad-blocked). The controller
+    /// waits for any dismissing sheet before presenting.
+    private func runAfterRewardedAd(_ work: @escaping () async -> Void) {
+        Task {
+            _ = await RewardedAdController.shared.presentIfReady()
+            await work()
         }
     }
 

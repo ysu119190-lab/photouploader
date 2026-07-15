@@ -185,21 +185,7 @@ private struct AssetCell: View {
                         .padding(4)
                 }
             }
-            .overlay {
-                if isSelected {
-                    Rectangle()
-                        .strokeBorder(Color.accentColor, lineWidth: 3)
-                        .background(Color.accentColor.opacity(0.25))
-                }
-            }
-            .overlay(alignment: .bottomLeading) {
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .symbolRenderingMode(.palette)
-                        .foregroundStyle(.white, Color.accentColor)
-                        .padding(4)
-                }
-            }
+            .selectableCell(isSelected: isSelected)
             .clipped()
             .contentShape(Rectangle())
             .task(id: asset.localIdentifier) {
