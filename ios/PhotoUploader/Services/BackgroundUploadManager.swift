@@ -30,6 +30,9 @@ final class BackgroundUploadManager: NSObject {
         let filePath: String
         let contentType: String
         let storageClass: String
+        // Optional so task descriptions written by older app versions still
+        // decode after an update mid-transfer.
+        let album: String?
         let key: String
         let attempt: Int
     }
@@ -48,6 +51,7 @@ final class BackgroundUploadManager: NSObject {
         fileURL: URL,
         contentType: String,
         storageClass: String,
+        album: String? = nil,
         onProgress: @escaping @Sendable (Double) -> Void
     ) async throws -> String {
         let uploadID = UUID().uuidString
@@ -64,6 +68,7 @@ final class BackgroundUploadManager: NSObject {
                         fileURL: fileURL,
                         contentType: contentType,
                         storageClass: storageClass,
+                        album: album,
                         attempt: 1
                     )
                 } catch {
@@ -80,11 +85,13 @@ final class BackgroundUploadManager: NSObject {
         fileURL: URL,
         contentType: String,
         storageClass: String,
+        album: String?,
         attempt: Int
     ) async throws {
         let presign = try await PresignClient.requestPresignedURL(
             contentType: contentType,
-            storageClass: storageClass
+            storageClass: storageClass,
+            album: album
         )
         guard let uploadURL = URL(string: presign.uploadUrl) else {
             throw UploadError.invalidUploadURL
@@ -105,6 +112,7 @@ final class BackgroundUploadManager: NSObject {
             filePath: fileURL.path,
             contentType: contentType,
             storageClass: storageClass,
+            album: album,
             key: presign.key,
             attempt: attempt
         )
@@ -203,6 +211,7 @@ extension BackgroundUploadManager: URLSessionTaskDelegate {
                         fileURL: fileURL,
                         contentType: metadata.contentType,
                         storageClass: metadata.storageClass,
+                        album: metadata.album,
                         attempt: metadata.attempt + 1
                     )
                 } catch {

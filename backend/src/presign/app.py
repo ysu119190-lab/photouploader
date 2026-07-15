@@ -45,6 +45,19 @@ ALLOWED_CONTENT_TYPES = {
 # and still retrieves instantly, suited to seldom-viewed backups.
 ALLOWED_STORAGE_CLASSES = {"STANDARD", "GLACIER_IR"}
 
+MAX_ALBUM_LENGTH = 64
+
+
+def _sanitize_album(raw):
+    """Make a photo-album name safe to embed as one S3 key folder: drop path
+    separators and non-printable characters, collapse whitespace, cap the
+    length. Returns None when nothing usable remains."""
+    if not isinstance(raw, str):
+        return None
+    cleaned = "".join(c for c in raw if c.isprintable() and c not in "/\\")
+    cleaned = " ".join(cleaned.split())[:MAX_ALBUM_LENGTH].strip()
+    return cleaned or None
+
 
 def handler(event, _context):
     claims = (
@@ -90,7 +103,13 @@ def _presign(user_id, event):
         )
 
     now = datetime.datetime.now(datetime.timezone.utc)
-    key = f"uploads/{user_id}/{now:%Y/%m/%d}/{uuid.uuid4()}{extension}"
+    # Album uploads mirror the phone's album structure under albums/<name>/,
+    # so the folder layout is meaningful when browsing the bucket directly.
+    album = _sanitize_album(body.get("album"))
+    if album:
+        key = f"uploads/{user_id}/albums/{album}/{now:%Y/%m/%d}/{uuid.uuid4()}{extension}"
+    else:
+        key = f"uploads/{user_id}/{now:%Y/%m/%d}/{uuid.uuid4()}{extension}"
 
     params = {"Bucket": BUCKET_NAME, "Key": key, "ContentType": content_type}
     # STANDARD is S3's default; only sign a StorageClass when it differs, so
@@ -123,8 +142,6 @@ def _list_photos(user_id, event):
     except ValueError:
         return _response(400, {"message": "offset and limit must be integers"})
 
-    # Object keys embed the upload date (uploads/<sub>/YYYY/MM/DD/<uuid>),
-    # so a reverse key sort yields newest-first without extra metadata.
     prefix = f"uploads/{user_id}/"
     objects = []
     kwargs = {"Bucket": BUCKET_NAME, "Prefix": prefix}
@@ -143,7 +160,10 @@ def _list_photos(user_id, event):
             break
         kwargs["ContinuationToken"] = token
 
-    objects.sort(key=lambda item: item["key"], reverse=True)
+    # Newest first. Sorting by key used to work (keys embed the date), but
+    # album uploads put the album name before the date, so sort by upload
+    # time instead (isoformat strings in UTC sort lexicographically).
+    objects.sort(key=lambda item: item["lastModified"], reverse=True)
     selected = objects[offset : offset + limit]
     # Signing is local computation — no AWS calls — so per-item URLs are cheap.
     for item in selected:

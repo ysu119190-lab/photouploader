@@ -34,7 +34,8 @@ enum UploadError: LocalizedError {
 enum PresignClient {
     static func requestPresignedURL(
         contentType: String,
-        storageClass: String
+        storageClass: String,
+        album: String? = nil
     ) async throws -> PresignResponse {
         let config = try BackendConfigStore.required()
         let idToken = try await TokenProvider.shared.validIdToken()
@@ -43,9 +44,12 @@ enum PresignClient {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try JSONEncoder().encode(
-            ["contentType": contentType, "storageClass": storageClass]
-        )
+        var body = ["contentType": contentType, "storageClass": storageClass]
+        if let album, !album.isEmpty {
+            // The backend mirrors the album as a folder in the object key.
+            body["album"] = album
+        }
+        request.httpBody = try JSONEncoder().encode(body)
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {

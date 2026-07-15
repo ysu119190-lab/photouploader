@@ -52,6 +52,18 @@ struct ContentView: View {
     private var uploadView: some View {
         NavigationStack {
             List {
+                if !viewModel.isUploading {
+                    Section {
+                        Button {
+                            startDifferentialBackup()
+                        } label: {
+                            Label("新着をまとめてバックアップ", systemImage: "arrow.triangle.2.circlepath")
+                        }
+                    } footer: {
+                        Text("まだバックアップしていない写真・動画をライブラリから探してアップロードします。アルバム分けも保存先に反映されます(初回は写真へのアクセス許可が必要)")
+                    }
+                }
+
                 if !viewModel.items.isEmpty {
                     Section {
                         ForEach(viewModel.items) { item in
@@ -86,14 +98,16 @@ struct ContentView: View {
                     }
                 }
             }
-            .overlay {
-                if viewModel.items.isEmpty && viewModel.history.isEmpty {
-                    ContentUnavailableView(
-                        "写真がありません",
-                        systemImage: "photo.on.rectangle.angled",
-                        description: Text("右上のボタンから写真や動画を選ぶとS3にアップロードします")
-                    )
-                }
+            .alert(
+                "バックアップ",
+                isPresented: Binding(
+                    get: { viewModel.infoMessage != nil },
+                    set: { if !$0 { viewModel.infoMessage = nil } }
+                )
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(viewModel.infoMessage ?? "")
             }
             .navigationTitle("Photo Uploader")
             .toolbar {
@@ -166,6 +180,16 @@ struct ContentView: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(accountDeletionError ?? "")
+            }
+        }
+    }
+
+    private func startDifferentialBackup() {
+        Task {
+            // The rewarded ad only plays when the scan actually found
+            // something to upload (never for an empty diff).
+            await viewModel.backupNewItems {
+                _ = await RewardedAdController.shared.presentIfReady()
             }
         }
     }

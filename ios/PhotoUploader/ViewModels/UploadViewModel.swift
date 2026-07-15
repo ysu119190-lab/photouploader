@@ -1,4 +1,5 @@
 import AVFoundation
+import Photos
 import PhotosUI
 import SwiftUI
 import UIKit
@@ -9,6 +10,8 @@ final class UploadViewModel: ObservableObject {
     /// Photos in the current (or most recent) batch.
     @Published private(set) var items: [UploadItem] = []
     @Published private(set) var isUploading = false
+    /// One-shot notice for the user (e.g. "nothing new to back up").
+    @Published var infoMessage: String?
     /// Finished batches, newest first, persisted across launches.
     @Published private(set) var history: [UploadBatchSummary] = UploadHistoryStore.load()
 
@@ -45,8 +48,66 @@ final class UploadViewModel: ObservableObject {
     /// while photos are being read from the photo library and prepared.
     func handleSelection(_ pickerItems: [PhotosPickerItem]) async {
         guard !pickerItems.isEmpty, !isUploading else { return }
-        isUploading = true
         items = []
+        var queue: [(source: BatchSource, itemID: UUID)] = []
+        for pickerItem in pickerItems {
+            let kind = Self.isVideo(pickerItem) ? "動画" : "写真"
+            let item = UploadItem(displayName: "\(kind) \(items.count + 1)")
+            items.append(item)
+            queue.append((.picker(pickerItem), item.id))
+        }
+        await runBatch(queue)
+    }
+
+    /// One-tap differential backup: uploads every photo/video in the library
+    /// that has not been backed up yet, preserving album names in S3.
+    /// `beforeStart` runs only when there is something to upload (used to
+    /// gate on the rewarded ad without showing it for empty scans).
+    func backupNewItems(beforeStart: () async -> Void = {}) async {
+        guard !isUploading else { return }
+
+        let status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+        guard status == .authorized || status == .limited else {
+            infoMessage = "写真ライブラリへのアクセスが許可されていません。設定 > プライバシーとセキュリティ > 写真 から許可してください"
+            return
+        }
+
+        let fetchOptions = PHFetchOptions()
+        fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: true)]
+        let allAssets = PHAsset.fetchAssets(with: fetchOptions)
+        var newAssets: [PHAsset] = []
+        allAssets.enumerateObjects { asset, _, _ in
+            guard asset.mediaType == .image || asset.mediaType == .video else { return }
+            if !UploadedAssetsStore.contains(asset.localIdentifier) {
+                newAssets.append(asset)
+            }
+        }
+
+        guard !newAssets.isEmpty else {
+            infoMessage = "新しい写真・動画はありません(すべてバックアップ済みです)"
+            return
+        }
+
+        await beforeStart()
+
+        items = []
+        var queue: [(source: BatchSource, itemID: UUID)] = []
+        for asset in newAssets {
+            let kind = asset.mediaType == .video ? "動画" : "写真"
+            let item = UploadItem(displayName: "\(kind) \(items.count + 1)")
+            items.append(item)
+            queue.append((.asset(asset), item.id))
+        }
+        await runBatch(queue)
+    }
+
+    private enum BatchSource {
+        case picker(PhotosPickerItem)
+        case asset(PHAsset)
+    }
+
+    private func runBatch(_ queue: [(source: BatchSource, itemID: UUID)]) async {
+        isUploading = true
         let startedAt = Date()
 
         // Keep the screen awake while the batch runs so the user can watch
@@ -80,24 +141,25 @@ final class UploadViewModel: ObservableObject {
             history = UploadHistoryStore.load()
         }
 
-        var queue: [(pickerItem: PhotosPickerItem, itemID: UUID)] = []
-        for pickerItem in pickerItems {
-            let kind = Self.isVideo(pickerItem) ? "動画" : "写真"
-            let item = UploadItem(displayName: "\(kind) \(items.count + 1)")
-            items.append(item)
-            queue.append((pickerItem, item.id))
-        }
-
         await withTaskGroup(of: Void.self) { group in
             var iterator = queue.makeIterator()
             for _ in 0..<maxConcurrentUploads {
                 guard let next = iterator.next() else { break }
-                group.addTask { await self.upload(next.pickerItem, itemID: next.itemID) }
+                group.addTask { await self.upload(next.source, itemID: next.itemID) }
             }
             while await group.next() != nil {
                 guard let next = iterator.next() else { continue }
-                group.addTask { await self.upload(next.pickerItem, itemID: next.itemID) }
+                group.addTask { await self.upload(next.source, itemID: next.itemID) }
             }
+        }
+    }
+
+    private func upload(_ source: BatchSource, itemID: UUID) async {
+        switch source {
+        case .picker(let pickerItem):
+            await upload(pickerItem, itemID: itemID)
+        case .asset(let asset):
+            await upload(asset, itemID: itemID)
         }
     }
 
@@ -207,6 +269,138 @@ final class UploadViewModel: ObservableObject {
         pickerItem.supportedContentTypes.contains { $0.conforms(to: .movie) }
     }
 
+    /// Differential-backup path: uploads one PHAsset, tagging it with the
+    /// name of the (first) album it belongs to so S3 mirrors the structure.
+    private func upload(_ asset: PHAsset, itemID: UUID) async {
+        do {
+            let album = Self.albumName(for: asset)
+
+            if asset.mediaType == .video {
+                let (fileURL, contentType) = try await Self.exportVideo(asset)
+                guard Self.supportedVideoMimeTypes.contains(contentType) else {
+                    try? FileManager.default.removeItem(at: fileURL)
+                    update(itemID) { $0.status = .failed(message: "対応していない動画形式です") }
+                    return
+                }
+                let thumbnail = await Self.makeVideoThumbnail(for: fileURL)
+                update(itemID) { $0.thumbnail = thumbnail }
+                try await startBackgroundUpload(
+                    fileURL: fileURL,
+                    contentType: contentType,
+                    album: album,
+                    itemID: itemID
+                )
+            } else {
+                let (rawData, rawContentType) = try await Self.exportImageData(asset)
+                let thumbnail = await Self.makeThumbnail(from: rawData)
+                update(itemID) { $0.thumbnail = thumbnail }
+                guard let (data, contentType) = await Self.prepareForUpload(
+                    data: rawData,
+                    contentType: rawContentType
+                ) else {
+                    update(itemID) { $0.status = .failed(message: "対応していない画像形式です") }
+                    return
+                }
+                let fileURL = try await Self.writeTemporaryFile(data: data)
+                try await startBackgroundUpload(
+                    fileURL: fileURL,
+                    contentType: contentType,
+                    album: album,
+                    itemID: itemID
+                )
+            }
+
+            UploadedAssetsStore.insert(asset.localIdentifier)
+        } catch {
+            update(itemID) { $0.status = .failed(message: error.localizedDescription) }
+        }
+    }
+
+    /// Shared tail of both upload paths: hand the staged file to the
+    /// background session and reflect progress/result in the list.
+    private func startBackgroundUpload(
+        fileURL: URL,
+        contentType: String,
+        album: String?,
+        itemID: UUID
+    ) async throws {
+        update(itemID) { $0.status = .uploading(progress: 0) }
+        let key = try await BackgroundUploadManager.shared.upload(
+            fileURL: fileURL,
+            contentType: contentType,
+            storageClass: StorageModeStore.current.rawValue,
+            album: album
+        ) { progress in
+            Task { @MainActor [weak self] in
+                self?.update(itemID) { $0.status = .uploading(progress: progress) }
+            }
+        }
+        update(itemID) { $0.status = .done(key: key) }
+    }
+
+    /// The name of the first user album containing the asset, if any.
+    nonisolated private static func albumName(for asset: PHAsset) -> String? {
+        let collections = PHAssetCollection.fetchAssetCollectionsContaining(
+            asset,
+            with: .album,
+            options: nil
+        )
+        return collections.firstObject?.localizedTitle
+    }
+
+    /// Original image bytes + MIME type for a library asset. Allows network
+    /// access so iCloud-offloaded originals are fetched too.
+    nonisolated private static func exportImageData(
+        _ asset: PHAsset
+    ) async throws -> (Data, String) {
+        try await withCheckedThrowingContinuation { continuation in
+            let options = PHImageRequestOptions()
+            options.isNetworkAccessAllowed = true
+            options.deliveryMode = .highQualityFormat
+            PHImageManager.default().requestImageDataAndOrientation(
+                for: asset,
+                options: options
+            ) { data, uti, _, _ in
+                guard let data else {
+                    continuation.resume(
+                        throwing: AssetExportError(message: "写真を読み込めませんでした")
+                    )
+                    return
+                }
+                let mime = uti.flatMap { UTType($0)?.preferredMIMEType } ?? "image/jpeg"
+                continuation.resume(returning: (data, mime))
+            }
+        }
+    }
+
+    /// Stages a library video as a temp file and returns its MIME type.
+    nonisolated private static func exportVideo(
+        _ asset: PHAsset
+    ) async throws -> (URL, String) {
+        let resources = PHAssetResource.assetResources(for: asset)
+        guard let resource = resources.first(where: { $0.type == .video })
+            ?? resources.first(where: { $0.type == .fullSizeVideo })
+        else {
+            throw AssetExportError(message: "動画を読み込めませんでした")
+        }
+
+        let type = UTType(resource.uniformTypeIdentifier)
+        let ext = type?.preferredFilenameExtension ?? "mov"
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("pending-uploads", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let destination = directory.appendingPathComponent("\(UUID().uuidString).\(ext)")
+
+        let options = PHAssetResourceRequestOptions()
+        options.isNetworkAccessAllowed = true
+        try await PHAssetResourceManager.default().writeData(
+            for: resource,
+            toFile: destination,
+            options: options
+        )
+        return (destination, type?.preferredMIMEType ?? "video/quicktime")
+    }
+
     private func update(_ id: UUID, _ mutate: (inout UploadItem) -> Void) {
         guard let index = items.firstIndex(where: { $0.id == id }) else { return }
         mutate(&items[index])
@@ -251,6 +445,12 @@ final class UploadViewModel: ObservableObject {
         try data.write(to: fileURL)
         return fileURL
     }
+}
+
+/// Failure while reading an asset out of the photo library.
+private struct AssetExportError: LocalizedError {
+    let message: String
+    var errorDescription: String? { message }
 }
 
 /// Receives a picked video as a staged file copy. Videos can be hundreds of
