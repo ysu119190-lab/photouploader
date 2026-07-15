@@ -58,23 +58,25 @@ jobs:
         id: sims
         run: |
           set -euo pipefail
-          runtime=$(xcrun simctl list -j runtimes | python3 -c '
+          # Pick device types from the runtime's own supportedDeviceTypes so
+          # the pair is compatible by construction (a device type newer than
+          # the runtime fails `simctl create` with "Incompatible device").
+          eval "$(xcrun simctl list -j runtimes | python3 -c '
           import json, sys
           runtimes = [r for r in json.load(sys.stdin)["runtimes"]
                       if r["platform"] == "iOS" and r["isAvailable"]]
           runtimes.sort(key=lambda r: [int(x) for x in r["version"].split(".")])
-          print(runtimes[-1]["identifier"])')
-          pick_type() {
-            xcrun simctl list -j devicetypes | python3 -c '
-          import json, sys
-          prefix = sys.argv[1]
-          types = [t["identifier"] for t in json.load(sys.stdin)["devicetypes"]
-                   if t["identifier"].rsplit(".", 1)[-1].startswith(prefix)]
-          print(types[-1])' "$1"
-          }
-          iphone=$(xcrun simctl create ci-iphone "$(pick_type iPhone)" "$runtime")
-          ipad=$(xcrun simctl create ci-ipad "$(pick_type iPad)" "$runtime")
-          echo "Created iPhone sim $iphone / iPad sim $ipad on $runtime"
+          runtime = runtimes[-1]
+          def pick(prefix):
+              types = [t["identifier"] for t in runtime["supportedDeviceTypes"]
+                       if t["name"].startswith(prefix)]
+              return types[-1]
+          print("RUNTIME=" + runtime["identifier"])
+          print("IPHONE_TYPE=" + pick("iPhone"))
+          print("IPAD_TYPE=" + pick("iPad"))')"
+          iphone=$(xcrun simctl create ci-iphone "$IPHONE_TYPE" "$RUNTIME")
+          ipad=$(xcrun simctl create ci-ipad "$IPAD_TYPE" "$RUNTIME")
+          echo "Created $IPHONE_TYPE + $IPAD_TYPE on $RUNTIME"
           echo "iphone=$iphone" >> "$GITHUB_OUTPUT"
           echo "ipad=$ipad" >> "$GITHUB_OUTPUT"
       - name: Run UI tests on iPhone Simulator
