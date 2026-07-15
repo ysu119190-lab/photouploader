@@ -4,6 +4,7 @@ import PhotosUI
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
+import UserNotifications
 
 @MainActor
 final class UploadViewModel: ObservableObject {
@@ -12,6 +13,8 @@ final class UploadViewModel: ObservableObject {
     @Published private(set) var isUploading = false
     /// One-shot notice for the user (e.g. "nothing new to back up").
     @Published var infoMessage: String?
+    /// Sources of the current batch, kept so failed items can be retried.
+    private var batchSources: [UUID: BatchSource] = [:]
     /// Finished batches, newest first, persisted across launches.
     @Published private(set) var history: [UploadBatchSummary] = UploadHistoryStore.load()
 
@@ -130,10 +133,46 @@ final class UploadViewModel: ObservableObject {
         case captured(UIImage)
     }
 
-    private func runBatch(_ queue: [(source: BatchSource, itemID: UUID)]) async {
+    /// Re-runs just the failed rows of the last batch.
+    func retryFailedItems() async {
+        guard !isUploading else { return }
+        let failedIDs = items.compactMap { item -> UUID? in
+            guard case .failed = item.status else { return nil }
+            return item.id
+        }
+        let queue = failedIDs.compactMap { id in
+            batchSources[id].map { (source: $0, itemID: id) }
+        }
+        guard !queue.isEmpty else { return }
+        for entry in queue {
+            update(entry.itemID) { $0.status = .pending }
+        }
+        await runBatch(queue, rememberSources: false)
+    }
+
+    var hasRetryableFailures: Bool {
+        items.contains { item in
+            guard case .failed = item.status else { return false }
+            return batchSources[item.id] != nil
+        }
+    }
+
+    private func runBatch(
+        _ queue: [(source: BatchSource, itemID: UUID)],
+        rememberSources: Bool = true
+    ) async {
         isUploading = true
         let startedAt = Date()
+        if rememberSources {
+            batchSources = Dictionary(
+                uniqueKeysWithValues: queue.map { ($0.itemID, $0.source) }
+            )
+        }
         persistItems()
+        // First batch triggers the notification permission prompt; later
+        // batches are a no-op. Denial just means no completion notification.
+        _ = try? await UNUserNotificationCenter.current()
+            .requestAuthorization(options: [.alert, .sound])
 
         // Keep the screen awake while the batch runs so the user can watch
         // progress; transfers themselves survive lock/background regardless.
@@ -165,6 +204,7 @@ final class UploadViewModel: ObservableObject {
             )
             history = UploadHistoryStore.load()
             persistItems()
+            notifyBatchFinishedIfBackgrounded()
         }
 
         await withTaskGroup(of: Void.self) { group in
@@ -204,7 +244,8 @@ final class UploadViewModel: ObservableObject {
                 fileURL: fileURL,
                 contentType: "image/jpeg",
                 album: nil,
-                itemID: itemID
+                itemID: itemID,
+                thumbnailData: await Self.makeThumbnailData(fromImageData: data)
             )
         } catch {
             update(itemID) { $0.status = .failed(message: error.localizedDescription) }
@@ -252,19 +293,13 @@ final class UploadViewModel: ObservableObject {
             // Background sessions upload from files, not memory.
             let fileURL = try await Self.writeTemporaryFile(data: data)
 
-            update(itemID) { $0.status = .uploading(progress: 0) }
-
-            let key = try await BackgroundUploadManager.shared.upload(
+            try await startBackgroundUpload(
                 fileURL: fileURL,
                 contentType: contentType,
-                storageClass: StorageModeStore.current.rawValue
-            ) { progress in
-                Task { @MainActor [weak self] in
-                    self?.update(itemID) { $0.status = .uploading(progress: progress) }
-                }
-            }
-
-            update(itemID) { $0.status = .done(key: key) }
+                album: nil,
+                itemID: itemID,
+                thumbnailData: await Self.makeThumbnailData(fromImageData: rawData)
+            )
             if let assetID = pickerItem.itemIdentifier {
                 UploadedAssetsStore.insert(assetID)
             }
@@ -292,19 +327,14 @@ final class UploadViewModel: ObservableObject {
 
             let thumbnail = await Self.makeVideoThumbnail(for: movie.url)
             update(itemID) { $0.thumbnail = thumbnail }
-            update(itemID) { $0.status = .uploading(progress: 0) }
 
-            let key = try await BackgroundUploadManager.shared.upload(
+            try await startBackgroundUpload(
                 fileURL: movie.url,
                 contentType: contentType,
-                storageClass: StorageModeStore.current.rawValue
-            ) { progress in
-                Task { @MainActor [weak self] in
-                    self?.update(itemID) { $0.status = .uploading(progress: progress) }
-                }
-            }
-
-            update(itemID) { $0.status = .done(key: key) }
+                album: nil,
+                itemID: itemID,
+                thumbnailData: thumbnail?.jpegData(compressionQuality: 0.7)
+            )
             if let assetID = pickerItem.itemIdentifier {
                 UploadedAssetsStore.insert(assetID)
             }
@@ -336,7 +366,8 @@ final class UploadViewModel: ObservableObject {
                     fileURL: fileURL,
                     contentType: contentType,
                     album: album,
-                    itemID: itemID
+                    itemID: itemID,
+                    thumbnailData: thumbnail?.jpegData(compressionQuality: 0.7)
                 )
             } else {
                 let (rawData, rawContentType) = try await Self.exportImageData(asset)
@@ -354,7 +385,8 @@ final class UploadViewModel: ObservableObject {
                     fileURL: fileURL,
                     contentType: contentType,
                     album: album,
-                    itemID: itemID
+                    itemID: itemID,
+                    thumbnailData: await Self.makeThumbnailData(fromImageData: rawData)
                 )
             }
 
@@ -364,26 +396,73 @@ final class UploadViewModel: ObservableObject {
         }
     }
 
-    /// Shared tail of both upload paths: hand the staged file to the
-    /// background session and reflect progress/result in the list.
+    /// Shared tail of all upload paths: hand the staged file to the
+    /// background session, reflect progress/result in the list, and push the
+    /// small gallery thumbnail once the main object is stored.
     private func startBackgroundUpload(
         fileURL: URL,
         contentType: String,
         album: String?,
-        itemID: UUID
+        itemID: UUID,
+        thumbnailData: Data?
     ) async throws {
         update(itemID) { $0.status = .uploading(progress: 0) }
-        let key = try await BackgroundUploadManager.shared.upload(
+        let result = try await BackgroundUploadManager.shared.upload(
             fileURL: fileURL,
             contentType: contentType,
             storageClass: StorageModeStore.current.rawValue,
-            album: album
+            album: album,
+            wantsThumbnail: thumbnailData != nil
         ) { progress in
             Task { @MainActor [weak self] in
                 self?.update(itemID) { $0.status = .uploading(progress: progress) }
             }
         }
-        update(itemID) { $0.status = .done(key: key) }
+        update(itemID) { $0.status = .done(key: result.key) }
+        if let thumbnailData {
+            await Self.uploadThumbnail(
+                thumbnailData,
+                to: result.thumbnailUploadURL,
+                for: result.key
+            )
+        }
+    }
+
+    /// Grid-sized JPEG for the gallery. ~480px keeps cells sharp on 3x
+    /// screens while staying around a few dozen kilobytes.
+    nonisolated private static func makeThumbnailData(fromImageData data: Data) async -> Data? {
+        UIImage(data: data)?
+            .preparingThumbnail(of: CGSize(width: 480, height: 480))?
+            .jpegData(compressionQuality: 0.7)
+    }
+
+    /// Best-effort thumbnail PUT — the gallery falls back to the full image
+    /// when a thumbnail is missing, so failures here are never surfaced.
+    nonisolated private static func uploadThumbnail(
+        _ data: Data,
+        to urlString: String?,
+        for key: String
+    ) async {
+        func put(_ urlString: String) async -> Bool {
+            guard let url = URL(string: urlString) else { return false }
+            var request = URLRequest(url: url)
+            request.httpMethod = "PUT"
+            request.setValue("image/jpeg", forHTTPHeaderField: "Content-Type")
+            guard let (_, response) = try? await URLSession.shared.upload(for: request, from: data),
+                  (response as? HTTPURLResponse)?.statusCode == 200
+            else {
+                return false
+            }
+            return true
+        }
+
+        if let urlString, await put(urlString) {
+            return
+        }
+        // The piggybacked URL may have expired while the main transfer sat
+        // in the background queue — re-sign once and retry.
+        guard let fresh = try? await PresignClient.requestThumbnailURL(for: key) else { return }
+        _ = await put(fresh.thumbnailUploadUrl)
     }
 
     /// The name of the first user album containing the asset, if any.
@@ -461,6 +540,26 @@ final class UploadViewModel: ObservableObject {
 
     private func persistItems() {
         UploadItemsSnapshotStore.save(items.map(\.persisted))
+    }
+
+    /// Local notification when a batch ends while the user is elsewhere, so
+    /// they don't have to reopen the app just to check.
+    private func notifyBatchFinishedIfBackgrounded() {
+        guard UIApplication.shared.applicationState != .active else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "バックアップ完了"
+        var body = "\(items.count)件中\(doneCount)件をアップロードしました"
+        if skippedCount > 0 { body += "(スキップ\(skippedCount)件)" }
+        if failedCount > 0 { body += "(失敗\(failedCount)件)" }
+        content.body = body
+        content.sound = .default
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(
+                identifier: UUID().uuidString,
+                content: content,
+                trigger: nil
+            )
+        )
     }
 
     /// Runs off the main actor: image decode / re-encode can be slow for large photos.

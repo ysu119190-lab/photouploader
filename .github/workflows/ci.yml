@@ -29,6 +29,10 @@ jobs:
         run: cfn-lint backend/template-quickcreate.yaml
       - name: Compile Lambda source
         run: python -m py_compile backend/src/presign/app.py
+      - name: Run backend unit tests
+        run: |
+          pip install pytest boto3
+          python -m pytest backend/tests -q
       - name: Check quick-create template is in sync with Lambda source
         run: |
           pip install pyyaml

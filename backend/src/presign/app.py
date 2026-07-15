@@ -1,7 +1,8 @@
-"""Lambda handling the app's API. Two routes, both JWT-protected:
+"""Lambda handling the app's API. Three routes, all JWT-protected:
 
-POST /presign  — issue a presigned S3 PUT URL for uploading one photo/video
-GET  /photos   — list the caller's uploaded photos with presigned GET URLs
+POST /presign        — presigned S3 PUT URL for one photo/video (and its thumbnail)
+GET  /photos         — list the caller's uploads with presigned GET URLs
+POST /photos/delete  — move uploads to trash/ (expired by lifecycle after 30 days)
 
 The API Gateway JWT authorizer (Cognito) has already validated the caller's
 ID token before this handler runs; the verified claims arrive in the request
@@ -47,6 +48,19 @@ ALLOWED_STORAGE_CLASSES = {"STANDARD", "GLACIER_IR"}
 
 MAX_ALBUM_LENGTH = 64
 
+UPLOAD_PREFIX = "uploads/"
+THUMB_PREFIX = "thumbs/"
+TRASH_PREFIX = "trash/"
+THUMBNAIL_CONTENT_TYPE = "image/jpeg"
+MAX_DELETE_KEYS = 100
+
+
+def _thumb_key(main_key):
+    """The thumbnail key for an upload: same path under thumbs/, .jpg."""
+    rest = main_key[len(UPLOAD_PREFIX):]
+    base, dot, _ext = rest.rpartition(".")
+    return THUMB_PREFIX + (base if dot else rest) + ".jpg"
+
 
 def _sanitize_album(raw):
     """Make a photo-album name safe to embed as one S3 key folder: drop path
@@ -70,8 +84,11 @@ def handler(event, _context):
     if not user_id:
         return _response(401, {"message": "Unauthorized"})
 
-    if event.get("routeKey") == "GET /photos":
+    route = event.get("routeKey")
+    if route == "GET /photos":
         return _list_photos(user_id, event)
+    if route == "POST /photos/delete":
+        return _delete_photos(user_id, event)
     return _presign(user_id, event)
 
 
@@ -80,6 +97,24 @@ def _presign(user_id, event):
         body = json.loads(event.get("body") or "{}")
     except json.JSONDecodeError:
         return _response(400, {"message": "Request body must be valid JSON"})
+
+    # Re-sign just a thumbnail PUT for an already-uploaded object (fallback
+    # for when the piggybacked thumbnail URL expired before the app used it).
+    thumbnail_for = body.get("thumbnailFor")
+    if thumbnail_for is not None:
+        if not (
+            isinstance(thumbnail_for, str)
+            and thumbnail_for.startswith(f"{UPLOAD_PREFIX}{user_id}/")
+        ):
+            return _response(403, {"message": "Key does not belong to caller"})
+        return _response(
+            200,
+            {
+                "thumbnailUploadUrl": _presign_thumbnail_put(thumbnail_for),
+                "thumbnailKey": _thumb_key(thumbnail_for),
+                "expiresIn": EXPIRES_IN_SECONDS,
+            },
+        )
 
     content_type = body.get("contentType", "")
     extension = ALLOWED_CONTENT_TYPES.get(content_type)
@@ -123,26 +158,37 @@ def _presign(user_id, event):
         ExpiresIn=EXPIRES_IN_SECONDS,
     )
 
-    return _response(
-        200,
-        {
-            "uploadUrl": upload_url,
-            "key": key,
-            "expiresIn": EXPIRES_IN_SECONDS,
-            "storageClass": storage_class,
+    result = {
+        "uploadUrl": upload_url,
+        "key": key,
+        "expiresIn": EXPIRES_IN_SECONDS,
+        "storageClass": storage_class,
+    }
+    # Piggyback a thumbnail PUT URL on the same response so the app needs no
+    # extra API call for it. Thumbnails are always JPEG and always STANDARD
+    # (they are read on every gallery view — Glacier retrieval fees would
+    # defeat their purpose).
+    if body.get("thumbnail"):
+        result["thumbnailUploadUrl"] = _presign_thumbnail_put(key)
+        result["thumbnailKey"] = _thumb_key(key)
+
+    return _response(200, result)
+
+
+def _presign_thumbnail_put(main_key):
+    return s3.generate_presigned_url(
+        "put_object",
+        Params={
+            "Bucket": BUCKET_NAME,
+            "Key": _thumb_key(main_key),
+            "ContentType": THUMBNAIL_CONTENT_TYPE,
         },
+        ExpiresIn=EXPIRES_IN_SECONDS,
     )
 
 
-def _list_photos(user_id, event):
-    params = event.get("queryStringParameters") or {}
-    try:
-        offset = max(int(params.get("offset", "0")), 0)
-        limit = min(max(int(params.get("limit", "40")), 1), 100)
-    except ValueError:
-        return _response(400, {"message": "offset and limit must be integers"})
-
-    prefix = f"uploads/{user_id}/"
+def _list_keys(prefix):
+    """All objects under a prefix as [{key, size, lastModified}, ...]."""
     objects = []
     kwargs = {"Bucket": BUCKET_NAME, "Prefix": prefix}
     while True:
@@ -159,12 +205,50 @@ def _list_photos(user_id, event):
         if not token:
             break
         kwargs["ContinuationToken"] = token
+    return objects
+
+
+def _album_of(key, user_id):
+    """Album name embedded in an upload key, or None."""
+    marker = f"{UPLOAD_PREFIX}{user_id}/albums/"
+    if not key.startswith(marker):
+        return None
+    return key[len(marker):].split("/", 1)[0]
+
+
+def _list_photos(user_id, event):
+    params = event.get("queryStringParameters") or {}
+    try:
+        offset = max(int(params.get("offset", "0")), 0)
+        limit = min(max(int(params.get("limit", "40")), 1), 100)
+    except ValueError:
+        return _response(400, {"message": "offset and limit must be integers"})
+    album_filter = _sanitize_album(params.get("album"))
+
+    objects = _list_keys(f"{UPLOAD_PREFIX}{user_id}/")
+
+    # Album names come from the unfiltered listing so the picker in the app
+    # always shows every album, whichever one is currently selected.
+    albums = sorted({
+        album for item in objects
+        if (album := _album_of(item["key"], user_id)) is not None
+    })
+    if album_filter:
+        objects = [
+            item for item in objects
+            if _album_of(item["key"], user_id) == album_filter
+        ]
 
     # Newest first. Sorting by key used to work (keys embed the date), but
     # album uploads put the album name before the date, so sort by upload
     # time instead (isoformat strings in UTC sort lexicographically).
     objects.sort(key=lambda item: item["lastModified"], reverse=True)
     selected = objects[offset : offset + limit]
+
+    # Thumbnails exist only for uploads made by newer app versions, so map
+    # which ones are actually present instead of signing blindly.
+    thumb_keys = {item["key"] for item in _list_keys(f"{THUMB_PREFIX}{user_id}/")}
+
     # Signing is local computation — no AWS calls — so per-item URLs are cheap.
     for item in selected:
         item["url"] = s3.generate_presigned_url(
@@ -172,12 +256,65 @@ def _list_photos(user_id, event):
             Params={"Bucket": BUCKET_NAME, "Key": item["key"]},
             ExpiresIn=EXPIRES_IN_SECONDS,
         )
+        thumb = _thumb_key(item["key"])
+        if thumb in thumb_keys:
+            item["thumbnailUrl"] = s3.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": BUCKET_NAME, "Key": thumb},
+                ExpiresIn=EXPIRES_IN_SECONDS,
+            )
 
     next_offset = offset + limit if offset + limit < len(objects) else None
     return _response(
         200,
-        {"photos": selected, "total": len(objects), "nextOffset": next_offset},
+        {
+            "photos": selected,
+            "total": len(objects),
+            "nextOffset": next_offset,
+            "albums": albums,
+        },
     )
+
+
+def _delete_photos(user_id, event):
+    """Moves uploads into trash/ (a lifecycle rule expires trash after 30
+    days) and drops their thumbnails. Trash copies are STANDARD so the
+    30-day retention doesn't pay Glacier's 90-day minimum twice."""
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except json.JSONDecodeError:
+        return _response(400, {"message": "Request body must be valid JSON"})
+
+    keys = body.get("keys")
+    if not isinstance(keys, list) or not keys or len(keys) > MAX_DELETE_KEYS:
+        return _response(
+            400,
+            {"message": f"keys must be a list of 1..{MAX_DELETE_KEYS} strings"},
+        )
+
+    own_prefix = f"{UPLOAD_PREFIX}{user_id}/"
+    deleted = []
+    errors = []
+    for key in keys:
+        if not (isinstance(key, str) and key.startswith(own_prefix)):
+            errors.append({"key": str(key), "error": "forbidden"})
+            continue
+        trash_key = TRASH_PREFIX + key[len(UPLOAD_PREFIX):]
+        try:
+            s3.copy_object(
+                Bucket=BUCKET_NAME,
+                CopySource={"Bucket": BUCKET_NAME, "Key": key},
+                Key=trash_key,
+                StorageClass="STANDARD",
+            )
+            s3.delete_object(Bucket=BUCKET_NAME, Key=key)
+            # Thumbnails are cheap derivatives — no trash copy, just delete.
+            s3.delete_object(Bucket=BUCKET_NAME, Key=_thumb_key(key))
+            deleted.append(key)
+        except Exception as error:  # noqa: BLE001 — per-key isolation
+            errors.append({"key": key, "error": str(error)})
+
+    return _response(200, {"deleted": deleted, "errors": errors})
 
 
 def _response(status_code, body):

@@ -7,6 +7,14 @@ import Foundation
 /// Each upload is a file-based task tagged (via `taskDescription`) with JSON
 /// metadata, so the manager can resolve results — and retry with a fresh
 /// presigned URL — even for tasks that finish after an app relaunch.
+/// What an upload resolves to: the S3 key, plus (when a thumbnail was
+/// requested) the presigned PUT URL for it, signed together with the final
+/// attempt's main URL.
+struct BackgroundUploadResult {
+    let key: String
+    let thumbnailUploadURL: String?
+}
+
 final class BackgroundUploadManager: NSObject {
     static let shared = BackgroundUploadManager()
     static let sessionIdentifier = "com.example.PhotoUploader.upload"
@@ -17,7 +25,7 @@ final class BackgroundUploadManager: NSObject {
 
     private var session: URLSession!
     private let lock = NSLock()
-    private var continuations: [String: CheckedContinuation<String, Error>] = [:]
+    private var continuations: [String: CheckedContinuation<BackgroundUploadResult, Error>] = [:]
     private var progressHandlers: [String: @Sendable (Double) -> Void] = [:]
     /// Response bodies keyed by task identifier, so S3's XML error detail can
     /// be surfaced when an upload is rejected.
@@ -30,9 +38,11 @@ final class BackgroundUploadManager: NSObject {
         let filePath: String
         let contentType: String
         let storageClass: String
-        // Optional so task descriptions written by older app versions still
+        // Optionals so task descriptions written by older app versions still
         // decode after an update mid-transfer.
         let album: String?
+        let wantsThumbnail: Bool?
+        let thumbnailUploadUrl: String?
         let key: String
         let attempt: Int
     }
@@ -52,8 +62,9 @@ final class BackgroundUploadManager: NSObject {
         contentType: String,
         storageClass: String,
         album: String? = nil,
+        wantsThumbnail: Bool = false,
         onProgress: @escaping @Sendable (Double) -> Void
-    ) async throws -> String {
+    ) async throws -> BackgroundUploadResult {
         let uploadID = UUID().uuidString
         return try await withCheckedThrowingContinuation { continuation in
             lock.lock()
@@ -69,6 +80,7 @@ final class BackgroundUploadManager: NSObject {
                         contentType: contentType,
                         storageClass: storageClass,
                         album: album,
+                        wantsThumbnail: wantsThumbnail,
                         attempt: 1
                     )
                 } catch {
@@ -86,12 +98,14 @@ final class BackgroundUploadManager: NSObject {
         contentType: String,
         storageClass: String,
         album: String?,
+        wantsThumbnail: Bool,
         attempt: Int
     ) async throws {
         let presign = try await PresignClient.requestPresignedURL(
             contentType: contentType,
             storageClass: storageClass,
-            album: album
+            album: album,
+            wantsThumbnail: wantsThumbnail
         )
         guard let uploadURL = URL(string: presign.uploadUrl) else {
             throw UploadError.invalidUploadURL
@@ -113,6 +127,8 @@ final class BackgroundUploadManager: NSObject {
             contentType: contentType,
             storageClass: storageClass,
             album: album,
+            wantsThumbnail: wantsThumbnail,
+            thumbnailUploadUrl: presign.thumbnailUploadUrl,
             key: presign.key,
             attempt: attempt
         )
@@ -121,15 +137,15 @@ final class BackgroundUploadManager: NSObject {
         task.resume()
     }
 
-    private func finish(_ uploadID: String, with result: Result<String, Error>) {
+    private func finish(_ uploadID: String, with result: Result<BackgroundUploadResult, Error>) {
         lock.lock()
         let continuation = continuations.removeValue(forKey: uploadID)
         progressHandlers.removeValue(forKey: uploadID)
         lock.unlock()
 
         switch result {
-        case .success(let key):
-            continuation?.resume(returning: key)
+        case .success(let uploadResult):
+            continuation?.resume(returning: uploadResult)
         case .failure(let error):
             continuation?.resume(throwing: error)
         }
@@ -200,7 +216,15 @@ extension BackgroundUploadManager: URLSessionTaskDelegate {
         switch status {
         case 200:
             deleteFile(at: fileURL)
-            finish(metadata.uploadID, with: .success(metadata.key))
+            finish(
+                metadata.uploadID,
+                with: .success(
+                    BackgroundUploadResult(
+                        key: metadata.key,
+                        thumbnailUploadURL: metadata.thumbnailUploadUrl
+                    )
+                )
+            )
         case 403 where metadata.attempt < Self.maxAttempts:
             // The presigned URL likely expired while the task waited in the
             // background queue — sign a fresh one and try again.
@@ -212,6 +236,7 @@ extension BackgroundUploadManager: URLSessionTaskDelegate {
                         contentType: metadata.contentType,
                         storageClass: metadata.storageClass,
                         album: metadata.album,
+                        wantsThumbnail: metadata.wantsThumbnail ?? false,
                         attempt: metadata.attempt + 1
                     )
                 } catch {

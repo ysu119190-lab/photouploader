@@ -84,13 +84,25 @@ struct ContentView: View {
                             UploadRow(item: item)
                         }
                     } header: {
-                        UploadSummaryHeader(
-                            done: viewModel.doneCount,
-                            skipped: viewModel.skippedCount,
-                            failed: viewModel.failedCount,
-                            total: viewModel.items.count,
-                            isUploading: viewModel.isUploading
-                        )
+                        VStack(alignment: .leading, spacing: 8) {
+                            UploadSummaryHeader(
+                                done: viewModel.doneCount,
+                                skipped: viewModel.skippedCount,
+                                failed: viewModel.failedCount,
+                                total: viewModel.items.count,
+                                isUploading: viewModel.isUploading
+                            )
+                            if !viewModel.isUploading && viewModel.hasRetryableFailures {
+                                Button {
+                                    Task { await viewModel.retryFailedItems() }
+                                } label: {
+                                    Label("失敗した項目を再試行", systemImage: "arrow.clockwise")
+                                        .font(.subheadline)
+                                }
+                                .buttonStyle(.borderless)
+                                .textCase(nil)
+                            }
+                        }
                     }
                 }
 

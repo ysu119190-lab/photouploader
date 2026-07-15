@@ -30,6 +30,11 @@
 | アカウント削除(アプリ内) | バックアップタブの「アカウント」メニューから。Cognito DeleteUser(アクセストークン)。S3の写真は残る。ガイドライン5.1.1(v)対応 |
 | 動画のバックアップ対応 | mp4 / mov / m4v。ファイル経由で転送(メモリに載せない)。ギャラリーでその場再生 |
 | 端末への復元(保存) | ギャラリー拡大表示の「端末に保存」。署名付きGET→写真アプリへ書き戻し(要・写真追加許可) |
+| サムネイル自動生成(2026-07-15) | アップロード時に480px JPEGを `thumbs/` にStandardで並行保存(presignに同梱・追加API呼び出しゼロ)。一覧はサムネのみ読むため高速・低通信量・Glacier取り出し料金ほぼゼロ |
+| 失敗のみ再試行(2026-07-15) | バッチ後に失敗項目だけ再キュー(進捗一覧のボタン) |
+| バックアップ完了通知(2026-07-15) | アプリ非表示中にバッチが終わるとローカル通知(件数・失敗数) |
+| ギャラリーのアルバム絞り込み(2026-07-15) | 左上のアルバムメニュー。バックエンドのalbumパラメータでプレフィックス絞り込み |
+| 保存済みの削除=ゴミ箱方式(2026-07-15) | 「選択」→複数削除。`trash/` へ移動し30日でライフサイクル完全削除(Glacier分はSTANDARDでコピー)。サムネは即削除 |
 
 ### バックエンド(AWS / SAM)
 
@@ -37,7 +42,8 @@
 |---|---|
 | S3バケット(暗号化・非公開) | キーは `uploads/<ユーザーID>/日付/UUID` でユーザー分離 |
 | Cognitoユーザープール + JWTオーソライザー | 共有APIキーは廃止済み |
-| API Lambda(Python) | `POST /presign`(署名付きPUT URL発行)+ `GET /photos`(写真一覧+署名付きGET URL) |
+| API Lambda(Python) | `POST /presign`(署名付きPUT URL発行。サムネURL同梱・thumbnailFor再署名対応)+ `GET /photos`(一覧+サムネURL+albums+albumフィルタ)+ `POST /photos/delete`(ゴミ箱移動) |
+| ユニットテスト(pytest) | `backend/tests/test_app.py` 15件。キー配置・所有権検証・ソート・ゴミ箱移動をフェイクS3で検証。CIで実行 |
 | ワンクリック構築テンプレート | CloudFormationクイック作成リンク用の単一ファイル版 |
 | 配布者向けスクリプト | `publish-template.ps1/.sh`(リンク発行)、`show-config.ps1/.sh`(設定表示+QR生成) |
 
@@ -47,8 +53,8 @@
 
 | ジョブ | 内容 |
 |---|---|
-| `backend-lint` | cfn-lint(2テンプレート)+ Lambdaコンパイル + InlineCode同期チェック |
-| `ios-simulator-test` | シミュレータでUIテスト実行、スクリーンショットをArtifact化 |
+| `backend-lint` | cfn-lint(2テンプレート)+ Lambdaコンパイル + pytest(15件)+ InlineCode/docs同期チェック |
+| `ios-simulator-test` | シミュレータでユニットテスト+UIテスト実行(iPhone/iPad)、スクリーンショットをArtifact化 |
 | `ios-unsigned-ipa` | サイドロード用の未署名 .ipa をArtifact化 |
 
 ---

@@ -40,6 +40,14 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          # Deleted photos are moved to trash/ by the API; expire them fully
+          # after 30 days so storage costs stop.
+          - Id: ExpireTrash
+            Status: Enabled
+            Prefix: trash/
+            ExpirationInDays: 30
 
   UserPool:
     Type: AWS::Cognito::UserPool
@@ -98,6 +106,13 @@ Resources:
             BucketName: !Ref PhotoBucket
         - S3ReadPolicy:
             BucketName: !Ref PhotoBucket
+        # SAM's S3WritePolicy has no s3:DeleteObject — the delete route
+        # (move to trash) needs it explicitly.
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:DeleteObject
+              Resource: !Sub "${PhotoBucket.Arn}/*"
       Events:
         Presign:
           Type: HttpApi
@@ -111,6 +126,12 @@ Resources:
             ApiId: !Ref Api
             Path: /photos
             Method: GET
+        DeletePhotos:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /photos/delete
+            Method: POST
 
 Outputs:
   AppConfigJson:

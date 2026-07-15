@@ -45,6 +45,19 @@ targets:
         SKAdNetworkItems:
           - SKAdNetworkIdentifier: cstr6suwn9.skadnetwork
 
+  # Pure-logic unit tests (model layer). XcodeGen wires TEST_HOST to the app
+  # automatically because of the app-target dependency.
+  PhotoUploaderTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - PhotoUploaderTests
+    dependencies:
+      - target: PhotoUploader
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+
   PhotoUploaderUITests:
     type: bundle.ui-testing
     platform: iOS
@@ -62,10 +75,12 @@ schemes:
     build:
       targets:
         PhotoUploader: all
+        PhotoUploaderTests: [test]
         PhotoUploaderUITests: [test]
     run:
       config: Debug
     test:
       config: Debug
       targets:
+        - PhotoUploaderTests
         - PhotoUploaderUITests
