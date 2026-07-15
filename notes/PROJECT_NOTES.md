@@ -117,7 +117,7 @@
 - [x] パスワードリセット(ForgotPassword)フロー
 - [x] アップロード済み写真の一覧・閲覧(S3 ListObjects + 署名付きGET)
 - [x] ワンタップ差分バックアップ+アルバム構造保持(2026-07-15)— バックアップ画面の「新着をまとめてバックアップ」。未バックアップの写真・動画をライブラリから検出して一括アップロード。所属アルバム名を presign に渡し、S3キーは `uploads/<sub>/albums/<アルバム>/日付/UUID` に。一覧APIのソートはキー順→LastModified順に変更(アルバムキーでも新しい順を維持)
-- [ ] 自前の写真ピッカー(アップロード済みバッジ表示・ソート対応)— 上と同じPHPhotoLibrary基盤
+- [x] 自前の写真ピッカー(2026-07-15)— 「ライブラリから選ぶ」。アップ済みバッジ(緑チェック)・新旧ソート・未アップのみフィルタ・動画の長さ表示。権限拒否時は設定への導線。標準PhotosPicker(権限不要)も併存
 - [ ] カメラ撮影からの直接アップロード
 - [ ] ATT(App Tracking Transparency)対応(広告パーソナライズする場合)
 - [ ] Sign in with Apple 対応 — **Apple Developer Program加入待ち**(SIWAのキー発行とアプリのentitlementに加入が必須。加入後: Cognitoにapple.com IDプロバイダ追加+アプリにASAuthorizationボタン実装)

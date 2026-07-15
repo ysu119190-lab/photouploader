@@ -89,10 +89,16 @@ final class UploadViewModel: ObservableObject {
         }
 
         await beforeStart()
+        await handleAssets(newAssets)
+    }
 
+    /// Uploads specific library assets (from the in-app library picker or
+    /// the differential backup), preserving album names in S3.
+    func handleAssets(_ assets: [PHAsset]) async {
+        guard !assets.isEmpty, !isUploading else { return }
         items = []
         var queue: [(source: BatchSource, itemID: UUID)] = []
-        for asset in newAssets {
+        for asset in assets {
             let kind = asset.mediaType == .video ? "動画" : "写真"
             let item = UploadItem(displayName: "\(kind) \(items.count + 1)")
             items.append(item)

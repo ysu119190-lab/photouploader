@@ -9,6 +9,7 @@ struct ContentView: View {
     @State private var isConfirmingAccountDeletion = false
     @State private var isDeletingAccount = false
     @State private var accountDeletionError: String?
+    @State private var isShowingLibraryPicker = false
 
     var body: some View {
         ZStack {
@@ -59,8 +60,13 @@ struct ContentView: View {
                         } label: {
                             Label("新着をまとめてバックアップ", systemImage: "arrow.triangle.2.circlepath")
                         }
+                        Button {
+                            isShowingLibraryPicker = true
+                        } label: {
+                            Label("ライブラリから選ぶ(アップ済み表示)", systemImage: "photo.stack")
+                        }
                     } footer: {
-                        Text("まだバックアップしていない写真・動画をライブラリから探してアップロードします。アルバム分けも保存先に反映されます(初回は写真へのアクセス許可が必要)")
+                        Text("「新着をまとめてバックアップ」は、まだバックアップしていない写真・動画を自動で探してアップロードします。アルバム分けも保存先に反映されます(初回は写真へのアクセス許可が必要)")
                     }
                 }
 
@@ -150,6 +156,16 @@ struct ContentView: View {
                     // upload starts anyway (backups are never ad-blocked).
                     _ = await RewardedAdController.shared.presentIfReady()
                     await viewModel.handleSelection(picked)
+                }
+            }
+            .sheet(isPresented: $isShowingLibraryPicker) {
+                LibraryPickerView { assets in
+                    Task {
+                        // Same ad gate as the system picker; the controller
+                        // waits for the sheet dismissal to finish first.
+                        _ = await RewardedAdController.shared.presentIfReady()
+                        await viewModel.handleAssets(assets)
+                    }
                 }
             }
             .safeAreaInset(edge: .bottom) {
