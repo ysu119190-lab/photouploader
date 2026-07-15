@@ -87,14 +87,14 @@
 - [x] **プライバシーポリシー作成**(App Store審査で必須)— 下書き `notes/privacy-policy.md`(Web版 `docs/privacy.html`)。角かっこの事業者名・連絡先を埋めれば完成
 - [x] **App Privacy(栄養ラベル)申告の整理** — 回答内容を `notes/app-privacy-label.md` にまとめ済み(App Store Connectに転記するだけ。提出直前にGoogleの開示ガイドで最新を再確認)
 - [x] **非パーソナライズ広告(NPA)設定の実装** — 全広告リクエストが `AdsConfig.makeRequest()`(npa=1)経由に。ATT不要・「トラッキングなし」申告が可能に。AdMob管理画面のEU同意設定のみ本番化時に要対応
-- [ ] **App Store審査対応**: 審査用デモ環境(デモ用AWSスタック+テストアカウント)の用意
+- [ ] **App Store審査対応**: 審査用デモ環境 — 手順・CLIコマンド・Review Notes文面は `notes/review-demo.md` に準備済み(2026-07-15)。スタックのデプロイとテストアカウント作成はユーザー作業(提出数日前に実施)
 - [ ] スクリーンショット・紹介文などストア素材の作成
 
 ### 審査・公開準備の追加課題(2026-07-09 洗い出し)
 
 - [x] **アプリ内アカウント削除**(ガイドライン5.1.1(v)で必須)— 実装済み
 - [x] **暗号化の輸出コンプライアンス申告** — `ITSAppUsesNonExemptEncryption: false` は project.yml に設定済みだった
-- [ ] **iPadでの起動確認** — iPhone向けアプリでもiPad動作は審査対象。CIにiPadシミュレータでの起動テスト追加を検討
+- [x] **iPadでの起動確認** — CIのシミュレータテストにiPad(第10世代・互換モード)での実行を追加(2026-07-15)。スクリーンショットも iphone / ipad で分けてArtifact化
 - [x] **Cognito確認メールの到達性(案内)** — コード入力画面3か所・はじめてガイド・READMEに「迷惑メールフォルダ確認」(差出人つき)と50通/日制限の注意を追加(2026-07-09)
 - [ ] **テンプレートへのSES設定オプション** — 多人数で同一スタックを使う配布形態にする場合のみ必要(個人利用はデフォルトの50通/日で足りる)。優先度低
 - [x] **AWS利用料の説明** — はじめてガイドに「料金の目安」セクション(標準/節約の月額目安+「アプリを消しても課金は止まらない」の注意)、READMEに料金表を追加(2026-07-09)。LPは対応済みだった。ストア説明文への再掲はストア素材タスクで
@@ -110,7 +110,7 @@
 - [x] Zenn技術記事の下書き(`notes/zenn-article.md`)
 - [x] ランディングページ(`docs/index.html`)+ プライバシーポリシー(`docs/privacy.html`)— GitHub Pages(main / docs)で公開する
 - [x] note向け一般紹介記事の下書き(`notes/note-article.md`)— スクショ差し込みとリンク追記で公開可
-- [ ] X(旧Twitter)リリース告知スレッド案
+- [x] X(旧Twitter)リリース告知スレッド案 — `notes/x-thread.md`(7ポスト構成。URL差し替えで投稿可)
 
 ### 機能改善(優先度順の候補)
 
@@ -124,6 +124,8 @@
 - [ ] 進捗一覧のアプリ再起動後の復元(アップロード自体は現状でも完走する)
 
 ### 運用メモ
+
+- **リポジトリ名を `iphon` → `photouploader` にリネーム済み(2026-07-15)。** 旧URLへのアクセス・push はGitHubが自動リダイレクトするが、GitHub Pages のURLは新名(`<ユーザー名>.github.io/photouploader/`)になる。プライバシーポリシーURLを申告するときは新URLで
 
 - `claude/iphone-s3-photo-upload-5dqlos` の内容は PR #1・#2 で main にマージ済み。以降の開発は新ブランチ(現在: `claude/iphone-s3-photo-upload-bbe4bg`)で行う
 - CI はPR単位実行に変更済み(2026-07-09)。マージ前の検証はPRを作成して行う(ブランチpushだけではCIが走らない)

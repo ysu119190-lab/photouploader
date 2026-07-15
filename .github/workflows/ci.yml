@@ -56,9 +56,24 @@ jobs:
           -resultBundlePath TestResults.xcresult
           CODE_SIGNING_ALLOWED=NO
         working-directory: ios
+      # App Review also checks iPhone apps on iPad (compatibility mode), so
+      # run the same smoke tests on an iPad simulator to catch launch issues.
+      - name: Run UI tests on iPad Simulator (compatibility mode)
+        run: >
+          xcodebuild test
+          -project PhotoUploader.xcodeproj
+          -scheme PhotoUploader
+          -destination 'platform=iOS Simulator,name=iPad (10th generation)'
+          -resultBundlePath TestResults-iPad.xcresult
+          CODE_SIGNING_ALLOWED=NO
+        working-directory: ios
       - name: Extract screenshots from test results
         if: always()
-        run: xcparse screenshots ios/TestResults.xcresult simulator-screenshots
+        run: |
+          xcparse screenshots ios/TestResults.xcresult simulator-screenshots/iphone
+          if [ -e ios/TestResults-iPad.xcresult ]; then
+            xcparse screenshots ios/TestResults-iPad.xcresult simulator-screenshots/ipad
+          fi
       - name: Upload simulator screenshots
         if: always()
         uses: actions/upload-artifact@v4
