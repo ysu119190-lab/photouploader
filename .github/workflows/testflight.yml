@@ -9,8 +9,8 @@ name: TestFlight
 #
 # ● 有効化までの手順
 #   1. Apple Developer Program に加入し、App Store Connect でアプリを登録
-#      (Bundle ID を決める。com.example.* のままでは提出できないので
-#       ios/project.yml の bundleIdPrefix を自分のものに変更すること)
+#      (Bundle ID は io.github.ysu119190-lab.photouploader — project.yml に
+#       設定済み。Developer Portal の Identifiers にも同じIDを登録すること)
 #   2. App Store Connect → ユーザとアクセス → 統合 → App Store Connect API
 #      で API キーを発行(役割: App Manager)。.p8 ファイルを保存
 #   3. Keychain Access などで Apple Distribution 証明書を作成し .p12 で書き出す

@@ -78,10 +78,14 @@ aws cognito-idp admin-set-user-password \
 >    shows it full-screen with a "save to device" (restore) option.
 > 4. Account deletion (guideline 5.1.1(v)) is available from the
 >    "アカウント" menu (top left) → "アカウントを削除".
+> 5. Uploaded items can be deleted from the "保存済み" tab via "選択" —
+>    they move to a server-side trash that auto-expires after 30 days.
 >
 > Notes:
-> - Ads are served by Google AdMob in non-personalized mode only (npa=1);
->   the app does not track users and shows no ATT prompt.
+> - Ads (banner, rewarded before uploads, and an app-open ad after
+>   returning from background) are served by Google AdMob in
+>   non-personalized mode only (npa=1); the app does not track users
+>   and shows no ATT prompt.
 > - The demo backend is a standard deployment of the same open-source
 >   template every user deploys: https://github.com/ysu119190-lab/photouploader
 
@@ -101,4 +105,5 @@ aws cognito-idp admin-set-user-password \
 - [ ] テストアカウントを作成し、実際にログイン→アップロード→閲覧まで通した(§2)
 - [ ] Review Notes の `<AppConfigJson>` を実値に置き換えた(§4)
 - [ ] デモ用バケットに数枚アップロード済みにしておく(「保存済み」タブが空でないように)
-- [ ] AdMobが本番ID+NPA設定になっている(テストIDのまま提出しない)
+- [x] AdMobの本番ID設定(2026-07-15済み。ReleaseビルドはバナーリワードApp Openとも本番ID・NPA固定)
+- [ ] AdMob管理画面のEU同意設定がNPA運用に合っている

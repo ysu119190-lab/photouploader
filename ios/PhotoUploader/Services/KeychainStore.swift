@@ -3,7 +3,9 @@ import Security
 
 /// Minimal Keychain wrapper for storing auth tokens.
 enum KeychainStore {
-    private static let service = "com.example.PhotoUploader"
+    // Matches the production bundle ID. Changing this invalidates stored
+    // tokens (existing installs just re-login) — fine before release.
+    private static let service = "io.github.ysu119190-lab.photouploader"
 
     static func save(_ data: Data, for key: String) {
         delete(key)
