@@ -96,7 +96,8 @@
 
 ### リリースまでに必須
 
-- [ ] **Apple Developer Program加入**($99/年)← ユーザー作業
+- [x] **Apple Developer Program加入**($99/年)— 加入完了(2026-07-15)。これでTestFlight配信・App Store提出・Sign in with Appleのブロックが解除
+- [ ] **Bundle IDの決定と登録** — 現在 `com.example.*`(提出不可)。候補: `io.github.ysu119190-lab.photouploader` など。決定後 project.yml の `bundleIdPrefix` を変更し、App Store Connectでアプリを登録
 - [ ] **TestFlight配信のCI構築** — ワークフロー下書きは作成済み(`.github/workflows/testflight.yml`・手動実行)。加入後にSecrets 6種を登録すれば動く(手順はファイル冒頭)
 - [x] **AdMob本番化(アプリ側)**(2026-07-15)— 本番アプリID+広告ユニット3種(バナー/リワード/App Open)を設定。ReleaseのみID有効・DebugはテストID(`#if DEBUG`)。SKAdNetworkリスト(42件)追加、`docs/app-ads.txt` 設置。App Open広告は「60秒以上のバックグラウンド復帰時のみ」表示
 - [ ] **AdMob本番化(残り・あなたの作業)**:
