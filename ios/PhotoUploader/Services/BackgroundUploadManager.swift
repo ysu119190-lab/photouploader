@@ -17,7 +17,7 @@ struct BackgroundUploadResult {
 
 final class BackgroundUploadManager: NSObject {
     static let shared = BackgroundUploadManager()
-    static let sessionIdentifier = "com.example.PhotoUploader.upload"
+    static let sessionIdentifier = "io.github.ysu119190-lab.photouploader.upload"
 
     /// Set by the app delegate when iOS relaunches the app for session events;
     /// called once all pending delegate messages have been delivered.
