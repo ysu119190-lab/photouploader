@@ -58,6 +58,19 @@ jobs:
 
       - uses: actions/checkout@v4
 
+      # App Store Connect は iOS 26 SDK(Xcode 26)以降でのビルドを必須と
+      # している。macos-15 ランナーのデフォルト Xcode は古いので明示選択する。
+      - name: Select Xcode 26
+        run: |
+          XCODE_APP=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1)
+          if [ -z "$XCODE_APP" ]; then
+            echo "::error::Xcode 26 がランナーに見つかりません。runs-on のイメージを更新してください"
+            ls -d /Applications/Xcode*.app || true
+            exit 1
+          fi
+          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+          xcodebuild -version
+
       - name: Install XcodeGen
         run: brew install xcodegen
 

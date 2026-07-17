@@ -32,6 +32,11 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # Registered App ID (App Store Connect). Keep exactly in sync.
         PRODUCT_BUNDLE_IDENTIFIER: io.github.ysu119190-lab.photouploader
+        # Must live at the target level: XcodeGen's iOS platform preset sets
+        # TARGETED_DEVICE_FAMILY to "1,2" on each target, which shadows the
+        # project-level "1" and made App Store validation demand iPad
+        # multitasking orientations.
+        TARGETED_DEVICE_FAMILY: "1"
     info:
       path: PhotoUploader/Info.plist
       properties:
