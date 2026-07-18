@@ -2,7 +2,7 @@
 
 開発の記録。実装済みの機能、発生した課題と対応、今後のタスクをここにまとめる。
 
-最終更新: 2026-07-17
+最終更新: 2026-07-18
 
 ---
 
@@ -80,6 +80,9 @@
 | 14 | pushがGH007(メール保護)で拒否 | セキュリティ監査を機にメール非公開設定を有効化したため | コミットのauthor/committerをnoreplyアドレスに統一 |
 | 15 | TestFlightアップロードが検証で毎回失敗(全8回) | ①`project.yml` のプロジェクトレベル `TARGETED_DEVICE_FAMILY: "1"` が、XcodeGenのiOSプラットフォームプリセット(ターゲットレベルに `"1,2"`)に上書きされ、意図せずiPad対応バンドルに → 「iPadマルチタスキングには4方向すべての画面向きが必要」で拒否。②アーカイブがiOS 18.5 SDKでビルドされ、App Store Connectが要求するiOS 26 SDK(Xcode 26)未満 | ①`TARGETED_DEVICE_FAMILY: "1"` をアプリターゲット自身に設定してプリセットを上書き(本来意図のiPhone専用に)。②ワークフローにXcode 26を明示選択するステップを追加(PR #6) |
 | 16 | はじめてガイドで構築URLをコピーできない(UXフィードバック) | ステップ1・2のURLが `Link` のみで、タップ=ブラウザで開くだけ。`List` 内の `Link` は長押しでもコピーメニューが出ずコピー不可。AWSコンソール作業をPCでやりたい人がURLをPCに送れず詰まる | 各リンクに「リンクをコピー」ボタン(`UIPasteboard`・コピー後2秒「コピーしました」表示)を追加。ステップ2にPC併用の案内フッターも追加 |
+| 17 | ASC APIキー(.p8)の中身をチャットに貼ってしまった | Secrets登録手順の説明時に、値の受け渡し方法を明示していなかった | キー(6MW494H936)を失効→再発行。以後 .p8/.p12/パスワード/プロファイルは**チャットに貼らずGitHub Secretsへ直接登録**する運用に |
+| 18 | TestFlight CI: .p12インポートで「MAC verification failed」 | OpenSSL 3 のデフォルト形式(AES-256/SHA-2)を macOS の `security import` が読めない | `openssl pkcs12 -export` に `-certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1` を付けてレガシー形式で再エクスポート |
+| 19 | TestFlight CI: 初期の実行で exportArchive が「Cloud signing permission error / No profiles for 'io.github…'」 | ASC APIキーのクラウド署名権限が原因と推定(個人アカウントでは「アクセス管理」の権限チェックボックスが表示されず、App Manager / Admin どちらのキーでも失敗)| 回避策として手動プロビジョニング版ワークフローを下書き(コミット 59b5c73・不採用)。その後の再試行ではクラウド署名のまま通り配信成功(課題#15参照。キー再発行(#17)後の権限反映が要因だった可能性)。現行mainのワークフローはクラウド署名方式 |
 
 **教訓メモ**
 
@@ -93,6 +96,9 @@
 - 本番広告IDをDebugビルドに入れない(`#if DEBUG`でテストIDに切り替え。無効トラフィック対策)
 - **XcodeGenのiOSプリセットは `TARGETED_DEVICE_FAMILY="1,2"` をターゲットに入れる**。iPhone専用にしたいならターゲットレベルで明示上書き(プロジェクトレベル設定は勝てない)
 - **App Store ConnectへのアップロードはiOS 26 SDK(Xcode 26)以降が必須**。macランナーのデフォルトXcodeに依存せず明示選択する
+- **秘密鍵・証明書・パスワードはチャットに貼らない**。GitHub Secretsへ直接登録。貼ってしまったら即失効・再発行
+- Mac無しでも配布用証明書は作れる: CSR作成〜.p12化はWindowsのGit Bash(OpenSSL)で完結。ただし.p12は**レガシー形式(SHA1-3DES)**でエクスポートしないとmacOSランナーが読めない(課題#18)
+- CIの署名エラーが続くときは、手動プロビジョニング(p12+.mobileprovisionをSecretsで渡す)への切り替えが確実な逃げ道(下書きはコミット 59b5c73 に保存)
 
 ---
 
@@ -153,7 +159,8 @@
 
 - **リポジトリ名を `iphon` → `photouploader` にリネーム済み(2026-07-15)。** 旧URLへのアクセス・push はGitHubが自動リダイレクトするが、GitHub Pages のURLは新名(`<ユーザー名>.github.io/photouploader/`)になる。プライバシーポリシーURLを申告するときは新URLで
 
-- PR #1〜#4 まで main にマージ済み(#4 は 2026-07-15。全機能+リリース準備一式)。開発ブランチは `claude/iphone-s3-photo-upload-bbe4bg` をmainから作り直して継続
+- PR #1〜#7 まで main にマージ済み(#5=コード整理+AdMob本番ID+Bundle ID確定、#6=TestFlight検証エラー修正、#7=ノート更新+ガイドURLコピー)。開発ブランチは `claude/iphone-s3-photo-upload-bbe4bg` をmainから作り直して継続
+- **セッション運用(トークン節約)**: 新しい作業は新セッションで始め、最初にこのファイルを読ませて引き継ぐ。CIの失敗はログ本文を貼らずrun URLを渡す。並列サブエージェントは使わない
 - **PR #4 のバックエンド変更(サムネイル・削除ルート・ゴミ箱ライフサイクル)は要再デプロイ**。クイック作成スタックは「スタックの更新」で同じテンプレートURLを指定
 - CI はPR単位実行(2026-07-09〜)。マージ前の検証はPRを作成して行う(ブランチpushだけではCIが走らない)
 - リポジトリはpublic化済み(2026-07-15)。公開前にシークレット監査済み(コミット履歴含めクリーン)。Push protectionの有効化を推奨
