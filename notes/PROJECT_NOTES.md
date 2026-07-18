@@ -2,7 +2,7 @@
 
 開発の記録。実装済みの機能、発生した課題と対応、今後のタスクをここにまとめる。
 
-最終更新: 2026-07-15
+最終更新: 2026-07-17
 
 ---
 
@@ -78,6 +78,8 @@
 | 12 | PR #3マージ後もmainに後半5コミットが無い | PRマージ後に同じブランチへpushを続けたため、マージ時点以降のコミットが取り残された | ブランチを最新mainへリベースして復旧。以後「マージされたらブランチはmainから作り直す」を徹底 |
 | 13 | CIのシミュレータテストが突然失敗(2連発) | ランナーイメージ更新で「iPhone 16」が消滅 → 機種名指定が破綻。次に最新機種を選んだらランタイムと非互換 | 機種名のハードコードをやめ、ランタイムの `supportedDeviceTypes` から選んでその場で作成・ID指定に変更 |
 | 14 | pushがGH007(メール保護)で拒否 | セキュリティ監査を機にメール非公開設定を有効化したため | コミットのauthor/committerをnoreplyアドレスに統一 |
+| 15 | TestFlightアップロードが検証で毎回失敗(全8回) | ①`project.yml` のプロジェクトレベル `TARGETED_DEVICE_FAMILY: "1"` が、XcodeGenのiOSプラットフォームプリセット(ターゲットレベルに `"1,2"`)に上書きされ、意図せずiPad対応バンドルに → 「iPadマルチタスキングには4方向すべての画面向きが必要」で拒否。②アーカイブがiOS 18.5 SDKでビルドされ、App Store Connectが要求するiOS 26 SDK(Xcode 26)未満 | ①`TARGETED_DEVICE_FAMILY: "1"` をアプリターゲット自身に設定してプリセットを上書き(本来意図のiPhone専用に)。②ワークフローにXcode 26を明示選択するステップを追加(PR #6) |
+| 16 | はじめてガイドで構築URLをコピーできない(UXフィードバック) | ステップ1・2のURLが `Link` のみで、タップ=ブラウザで開くだけ。`List` 内の `Link` は長押しでもコピーメニューが出ずコピー不可。AWSコンソール作業をPCでやりたい人がURLをPCに送れず詰まる | 各リンクに「リンクをコピー」ボタン(`UIPasteboard`・コピー後2秒「コピーしました」表示)を追加。ステップ2にPC併用の案内フッターも追加 |
 
 **教訓メモ**
 
@@ -89,6 +91,8 @@
 - **PRがマージされたら同じブランチに積み続けない**。mainから作り直す
 - macOSランナーは10倍換算で枠を食う。CIはPR単位+自動キャンセルが基本
 - 本番広告IDをDebugビルドに入れない(`#if DEBUG`でテストIDに切り替え。無効トラフィック対策)
+- **XcodeGenのiOSプリセットは `TARGETED_DEVICE_FAMILY="1,2"` をターゲットに入れる**。iPhone専用にしたいならターゲットレベルで明示上書き(プロジェクトレベル設定は勝てない)
+- **App Store ConnectへのアップロードはiOS 26 SDK(Xcode 26)以降が必須**。macランナーのデフォルトXcodeに依存せず明示選択する
 
 ---
 
@@ -98,8 +102,8 @@
 
 - [x] **Apple Developer Program加入**($99/年)— 加入完了(2026-07-15)。これでTestFlight配信・App Store提出・Sign in with Appleのブロックが解除
 - [x] **Bundle IDの決定** — `io.github.ysu119190-lab.photouploader` に確定・project.yml設定済み(2026-07-15)。Keychainサービス名・background session識別子も同名に統一
-- [ ] **App Store Connectでのアプリ登録** ← ユーザー作業: ①developer.apple.com → Identifiers で上のBundle IDを登録 ②App Store Connect → 新規アプリ作成 ③TestFlight用Secrets 6種を登録(手順は `.github/workflows/testflight.yml` 冒頭)
-- [ ] **TestFlight配信のCI構築** — ワークフロー下書きは作成済み(`.github/workflows/testflight.yml`・手動実行)。加入後にSecrets 6種を登録すれば動く(手順はファイル冒頭)
+- [x] **App Store Connectでのアプリ登録**(2026-07-17)— Bundle ID登録・アプリ作成・TestFlight用Secrets 6種の登録が完了
+- [x] **TestFlight配信のCI構築**(2026-07-17)— ワークフロー(`.github/workflows/testflight.yml`)が実際にTestFlightへ配信成功。アップロード検証エラー2件を修正(下記 課題#15。PR #6)
 - [x] **AdMob本番化(アプリ側)**(2026-07-15)— 本番アプリID+広告ユニット3種(バナー/リワード/App Open)を設定。ReleaseのみID有効・DebugはテストID(`#if DEBUG`)。SKAdNetworkリスト(42件)追加、`docs/app-ads.txt` 設置。App Open広告は「60秒以上のバックグラウンド復帰時のみ」表示
 - [ ] **AdMob本番化(残り・あなたの作業)**:
   - AdMob管理画面の**EU同意設定をNPA運用に合わせる**(プライバシーとメッセージ)
@@ -123,7 +127,7 @@
 - [x] **クイック作成リンクの冗長化**(2026-07-15)— テンプレートをGitHub Pages(`docs/template-quickcreate.yaml`)にも配置し、CIがbackend側との同期をチェック。S3消失時はダウンロード→コンソールの「テンプレートファイルのアップロード」で復旧
 - [x] **サポートURL・問い合わせ窓口**(2026-07-15)— LPに「サポート・お問い合わせ」セクション(GitHub Issues窓口+迷惑メールFAQ)。メール窓口はコメントアウトで用意済み、公開する場合はアドレスを記入
 - [x] **動画対応** — 非対応の明示ではなく対応自体を実装(2026-07-09)。アップロード(mp4/mov/m4v)・ギャラリー再生・復元まで対応済み
-- [ ] **ストア掲載名の検討** — 「PhotoUploader」は一般名詞的で埋もれ・重複の懸念。日本語サブタイトル込みの名称を検討
+- [x] **ストア掲載名の検討** — B案「PhotoUploader 自分のAWSに写真バックアップ」に決定(2026-07-17)。App Store Connect への登録はユーザー作業(`notes/store-listing.md §1`)
 - [ ] **年齢レーティング・配信地域** — 広告ありでのレーティング申告。日本語のみなら配信地域は日本に絞るのが無難
 - [ ] (構想)**運営ホスト版バックエンド** — 構想メモを `notes/hosted-backend-idea.md` に作成(2026-07-15)。リリース後、セットアップ離脱が支配的なら着手判断
 
@@ -154,4 +158,5 @@
 - CI はPR単位実行(2026-07-09〜)。マージ前の検証はPRを作成して行う(ブランチpushだけではCIが走らない)
 - リポジトリはpublic化済み(2026-07-15)。公開前にシークレット監査済み(コミット履歴含めクリーン)。Push protectionの有効化を推奨
 - クイック作成リンクのテンプレート更新は `publish-template.ps1` 再実行のみ(アプリ更新不要)。バケット/リージョンを変えた場合のみ `AppLinks.swift` の更新が必要
-- AltStore運用中は7日ごとのRefreshが必要(TestFlight移行で解消)
+- ~~AltStore運用中は7日ごとのRefreshが必要~~ → **TestFlight配信に移行済み(2026-07-17)**。7日Refreshの制約は解消
+- **TestFlightワークフローはmainから手動実行**(Actions → TestFlight → Run workflow)。ビルド番号はrun numberで単調増加、マーケティングバージョンは `project.yml` で管理

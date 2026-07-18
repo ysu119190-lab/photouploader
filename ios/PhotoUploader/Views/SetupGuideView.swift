@@ -1,8 +1,12 @@
 import SwiftUI
+import UIKit
 
 /// Step-by-step first-time setup guide for users without AWS/GitHub
 /// knowledge. Reached from the setup screen.
 struct SetupGuideView: View {
+    /// Absolute string of the link whose "copied!" feedback is showing.
+    @State private var copiedURL: String?
+
     var body: some View {
         List {
             Section {
@@ -18,17 +22,25 @@ struct SetupGuideView: View {
             Section("ステップ 1: AWSアカウントを作る") {
                 Text("AWSの無料アカウントを作成します(クレジットカードの登録が必要です)。すでに持っている場合はステップ2へ。")
                     .font(.callout)
-                Link(destination: AppLinks.awsSignUpURL) {
-                    Label("AWSアカウント作成ページを開く", systemImage: "person.badge.plus")
-                }
+                linkRow(
+                    url: AppLinks.awsSignUpURL,
+                    label: "AWSアカウント作成ページを開く",
+                    systemImage: "person.badge.plus"
+                )
             }
 
-            Section("ステップ 2: 保存先をワンクリックで作る") {
+            Section {
                 Text("下のボタンを押すとAWSの管理画面が開きます。ログイン後、ページ下部の確認チェックをすべてオンにして「スタックの作成」ボタンを押してください。3〜5分で自動的に完成します。")
                     .font(.callout)
-                Link(destination: AppLinks.backendQuickCreateURL) {
-                    Label("保存先を作成する(ワンクリック構築)", systemImage: "wand.and.stars")
-                }
+                linkRow(
+                    url: AppLinks.backendQuickCreateURL,
+                    label: "保存先を作成する(ワンクリック構築)",
+                    systemImage: "wand.and.stars"
+                )
+            } header: {
+                Text("ステップ 2: 保存先をワンクリックで作る")
+            } footer: {
+                Text("パソコンのブラウザで作業したい場合は「リンクをコピー」でURLを控え、メールやメモでパソコンに送ってから開いてください。")
             }
 
             Section("ステップ 3: 接続設定をコピーする") {
@@ -48,6 +60,34 @@ struct SetupGuideView: View {
         }
         .navigationTitle("はじめてガイド")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    /// A tappable link plus a "copy link" button. `Link` alone only opens the
+    /// URL — there is no way to copy it — which blocks users who want to move
+    /// the AWS console work to a PC. The copy button fills that gap and shows
+    /// brief confirmation.
+    @ViewBuilder
+    private func linkRow(url: URL, label: String, systemImage: String) -> some View {
+        Link(destination: url) {
+            Label(label, systemImage: systemImage)
+        }
+        Button {
+            UIPasteboard.general.string = url.absoluteString
+            withAnimation { copiedURL = url.absoluteString }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                if copiedURL == url.absoluteString {
+                    withAnimation { copiedURL = nil }
+                }
+            }
+        } label: {
+            let copied = copiedURL == url.absoluteString
+            Label(
+                copied ? "コピーしました" : "リンクをコピー",
+                systemImage: copied ? "checkmark" : "doc.on.doc"
+            )
+            .font(.callout)
+            .foregroundStyle(copied ? Color.green : Color.accentColor)
+        }
     }
 }
 
