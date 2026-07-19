@@ -101,7 +101,7 @@ aws cognito-idp admin-set-user-password \
 
 ## 6. 提出前チェックリスト
 
-- [ ] デモスタックをデプロイし AppConfigJson を控えた(§1)
+- [x] デモスタックをデプロイし AppConfigJson を控えた(§1)(2026-07-19。スタック名 photouploader-review-demo / ap-northeast-1 / sam deploy --guided。審査後も削除しない)
 - [ ] テストアカウントを作成し、実際にログイン→アップロード→閲覧まで通した(§2)
 - [ ] Review Notes の `<AppConfigJson>` を実値に置き換えた(§4)
 - [ ] デモ用バケットに数枚アップロード済みにしておく(「保存済み」タブが空でないように)
