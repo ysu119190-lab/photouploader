@@ -106,4 +106,4 @@ aws cognito-idp admin-set-user-password \
 - [ ] Review Notes の `<AppConfigJson>` を実値に置き換えた(§4)
 - [ ] デモ用バケットに数枚アップロード済みにしておく(「保存済み」タブが空でないように)
 - [x] AdMobの本番ID設定(2026-07-15済み。ReleaseビルドはバナーリワードApp Openとも本番ID・NPA固定)
-- [ ] AdMob管理画面のEU同意設定がNPA運用に合っている
+- [x] AdMob管理画面のEU同意設定がNPA運用に合っている(2026-07-19済み。GDPRメッセージをEEA・英国ターゲットで公開。UMP SDK未導入のためEEAでは広告非配信=NPA運用と矛盾なし)
