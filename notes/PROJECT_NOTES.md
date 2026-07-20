@@ -115,7 +115,7 @@
 - [x] **AdMob本番化(アプリ側)**(2026-07-15)— 本番アプリID+広告ユニット3種(バナー/リワード/App Open)を設定。ReleaseのみID有効・DebugはテストID(`#if DEBUG`)。SKAdNetworkリスト(42件)追加、`docs/app-ads.txt` 設置。App Open広告は「60秒以上のバックグラウンド復帰時のみ」表示
 - [ ] **AdMob本番化(残り・あなたの作業)**:
   - ~~AdMob管理画面の**EU同意設定をNPA運用に合わせる**(プライバシーとメッセージ)~~ — **完了(2026-07-19)**。GDPRメッセージを「GDPRが適用される国(EEA・英国)」ターゲットで公開。UMP SDK未導入のためEEA/英国では広告自体が配信されない(2024年以降は認定CMP必須のため。違反ではなく収益ゼロなだけ。フェイルオープン設計で動作に支障なし)。配信地域を日本に絞れば実務上無関係。将来EEAで収益化するならUMP SDK導入が必要
-  - **app-ads.txt をドメイン直下に置く** — 仕様上 `ysu119190-lab.github.io/app-ads.txt`(ドメインルート)が参照されるため、`ysu119190-lab.github.io` という名前のリポジトリを作り `app-ads.txt` 1ファイルを置いてPagesを有効化(2分)。docs/ 内のコピーはパス付きURLなので保険
+  - ~~**app-ads.txt をドメイン直下に置く**~~ — **配置完了(2026-07-20)**。`ysu119190-lab.github.io` リポジトリにファイルを配置済み。残り確認: ブラウザで `https://ysu119190-lab.github.io/app-ads.txt` を開き、`google.com, pub-5308803840858138, DIRECT, f08c47fec0942fa0` の1行が表示されればOK(表示されない場合はSettings→PagesでSource: main / (root) を設定)。docs/ 内のコピーはパス付きURLなので保険として維持
   - ストア公開後: AdMobのアプリをApp Storeリスティングに紐づけ → app-ads.txtの確認クロールを実行
   - 提出前にSKAdNetworkリストをGoogle公式の最新と照合(https://developers.google.com/admob/ios/3p-skadnetworks — 開発環境からは取得不可だったため既知の公式リストを使用)
 - [x] **プライバシーポリシー作成**(App Store審査で必須)— 下書き `notes/privacy-policy.md`(Web版 `docs/privacy.html`)。角かっこの事業者名・連絡先を埋めれば完成
