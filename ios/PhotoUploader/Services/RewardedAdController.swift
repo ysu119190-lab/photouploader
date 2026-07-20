@@ -14,6 +14,7 @@ final class RewardedAdController: NSObject {
 
     /// Fetches the next ad in the background.
     func preload() {
+        guard !AdsConfig.isDisabledForUITests else { return }
         guard rewardedAd == nil, !isLoading else { return }
         isLoading = true
         GADRewardedAd.load(
@@ -31,6 +32,7 @@ final class RewardedAdController: NSObject {
     /// Returns true when the user earned the reward (finished watching).
     @MainActor
     func presentIfReady() async -> Bool {
+        guard !AdsConfig.isDisabledForUITests else { return false }
         guard rewardedAd != nil, let root = Self.rootViewController else {
             preload()
             return false

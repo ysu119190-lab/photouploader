@@ -1,3 +1,4 @@
+import Foundation
 import GoogleMobileAds
 
 /// AdMob configuration.
@@ -17,6 +18,13 @@ enum AdsConfig {
     static let rewardedAdUnitID = "ca-app-pub-5308803840858138/1031572681"
     static let appOpenAdUnitID = "ca-app-pub-5308803840858138/1658378785"
     #endif
+
+    /// UI-test hook: the store-screenshots workflow launches the app with
+    /// this argument so Debug builds don't show Google *test* ads in the
+    /// App Store screenshots. Banner/rewarded/app-open all honor it.
+    static var isDisabledForUITests: Bool {
+        ProcessInfo.processInfo.arguments.contains("-uiTestDisableAds")
+    }
 
     /// Every ad request must be created here. Requests carry npa=1 so Google
     /// only serves non-personalized ads — the App Privacy label declares "no

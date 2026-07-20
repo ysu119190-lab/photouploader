@@ -21,6 +21,7 @@ final class AppOpenAdController: NSObject {
 
     /// Fetches the next ad in the background.
     func preload() {
+        guard !AdsConfig.isDisabledForUITests else { return }
         guard ad == nil, !isLoading else { return }
         isLoading = true
         GADAppOpenAd.load(
@@ -42,6 +43,7 @@ final class AppOpenAdController: NSObject {
     /// Call when the scene becomes active again.
     @MainActor
     func presentIfReturningFromBackground() {
+        guard !AdsConfig.isDisabledForUITests else { return }
         guard let backgroundedAt,
               Date().timeIntervalSince(backgroundedAt) >= Self.minBackgroundInterval
         else { return }

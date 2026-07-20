@@ -62,7 +62,20 @@ struct AuthView: View {
             }
             .navigationTitle("PhotoUploader")
             .disabled(isBusy)
+            .onAppear(perform: prefillForUITestsIfNeeded)
         }
+    }
+
+    /// Store-screenshot UI tests pass the demo account this way because
+    /// typing into simulator text fields is flaky in CI.
+    private func prefillForUITestsIfNeeded() {
+        #if DEBUG
+        let env = ProcessInfo.processInfo.environment
+        if email.isEmpty, let presetEmail = env["UITEST_PREFILL_EMAIL"] {
+            email = presetEmail
+            password = env["UITEST_PREFILL_PASSWORD"] ?? ""
+        }
+        #endif
     }
 
     @ViewBuilder
