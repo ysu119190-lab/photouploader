@@ -206,10 +206,12 @@ struct ContentView: View {
                 .ignoresSafeArea()
             }
             .safeAreaInset(edge: .bottom) {
-                BannerAdView()
-                    .frame(width: 320, height: 50)
-                    .frame(maxWidth: .infinity)
-                    .background(.bar)
+                if !AdsConfig.isDisabledForUITests {
+                    BannerAdView()
+                        .frame(width: 320, height: 50)
+                        .frame(maxWidth: .infinity)
+                        .background(.bar)
+                }
             }
             .confirmationDialog(
                 "アカウントを削除しますか?",

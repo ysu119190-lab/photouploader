@@ -18,6 +18,16 @@ final class SessionStore: ObservableObject {
     @Published private(set) var state: State = .loading
 
     func bootstrap() async {
+        #if DEBUG
+        // Store-screenshot UI tests pass the real demo backend's
+        // AppConfigJson this way (typing into the setup form is flaky in CI).
+        if BackendConfigStore.load() == nil,
+           let json = ProcessInfo.processInfo.environment["UITEST_CONFIG_JSON"],
+           let config = BackendConfigStore.parse(json: json) {
+            BackendConfigStore.save(config)
+        }
+        #endif
+
         // UI tests pass this flag to reach the sign-in screen without having
         // to type into the setup form (simulator typing is flaky in CI).
         if ProcessInfo.processInfo.arguments.contains("-uiTestPresetConfig"),

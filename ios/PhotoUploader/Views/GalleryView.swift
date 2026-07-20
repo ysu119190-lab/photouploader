@@ -35,6 +35,10 @@ struct GalleryView: View {
                                 Task { await viewModel.loadMore() }
                             }
                         }
+                        .accessibilityElement()
+                        .accessibilityIdentifier(
+                            photo.isVideo ? "gallery-video-cell" : "gallery-photo-cell"
+                        )
                     }
                 }
 

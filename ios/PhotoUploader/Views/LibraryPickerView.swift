@@ -83,6 +83,8 @@ struct LibraryPickerView: View {
                             isUploaded: UploadedAssetsStore.contains(asset.localIdentifier)
                         )
                         .onTapGesture { toggle(asset) }
+                        .accessibilityElement()
+                        .accessibilityIdentifier("library-asset-cell")
                     }
                 }
             }
