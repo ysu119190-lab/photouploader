@@ -69,7 +69,7 @@ aws cognito-idp admin-set-user-password \
 >    paste field ("まとめて貼り付け") and paste the following configuration
 >    JSON, then tap the load button ("貼り付けた内容を読み込む"):
 >
->    `<AppConfigJson>`  ← §1の実際の1行JSONに置き換える
+>    `<{"apiEndpoint":"https://0t0zusp3vb.execute-api.ap-northeast-1.amazonaws.com","region":"ap-northeast-1","clientId":"5ba7ku5qehtougs71b8agi9ov9"}>`
 >
 > 2. On the sign-in screen, log in with the demo account provided in the
 >    App Review sign-in information (email/password above).
