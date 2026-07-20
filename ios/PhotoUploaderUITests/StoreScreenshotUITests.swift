@@ -48,26 +48,33 @@ final class StoreScreenshotUITests: XCTestCase {
         loginButton.tap()
 
         // ⑤ 保存モードの選択 — the one-time chooser right after first sign-in.
-        // Poll for either the chooser or the signed-in tab bar so a missing
-        // chooser (already answered / presentation race) doesn't kill the
-        // whole capture run; if neither shows up, sign-in itself failed —
-        // attach the screen and hierarchy as evidence before failing.
-        let storageConfirm = app.buttons["この設定ではじめる"]
+        // Detect the sheet by its nav-bar title: the confirm button sits at
+        // the bottom of a long lazy List and does not exist in the hierarchy
+        // until scrolled to (run #3 proved this — the sheet covered the
+        // screen while the button query stayed empty). The tab bar behind
+        // the sheet still "exists", so it can't disprove the sheet either.
+        let storageSheetTitle = app.staticTexts["保存モードの選択"]
         let backupTab = app.tabBars.buttons["バックアップ"]
         let signInDeadline = Date().addingTimeInterval(60)
-        while Date() < signInDeadline && !storageConfirm.exists && !backupTab.exists {
+        while Date() < signInDeadline && !storageSheetTitle.exists && !backupTab.exists {
             sleep(2)
         }
-        // The chooser sheet animates in an instant *after* the tab view
-        // appears (run #2 hit a list button underneath it and failed on
-        // "not hittable"), so even when the tab bar wins the race, give the
-        // sheet time to present.
-        if backupTab.exists && !storageConfirm.exists {
-            _ = storageConfirm.waitForExistence(timeout: 10)
+        // The sheet animates in an instant after the tab view appears, so
+        // even when the tab bar wins the race, give the sheet time to show.
+        if !storageSheetTitle.exists {
+            _ = storageSheetTitle.waitForExistence(timeout: 10)
         }
-        if storageConfirm.exists {
+        if storageSheetTitle.exists {
             sleep(2)
             attachScreenshot(named: "05-storage-mode-choice")
+            // Scroll until the lazily-created confirm button materializes.
+            let storageConfirm = app.buttons["この設定ではじめる"]
+            var swipes = 0
+            while !storageConfirm.exists && swipes < 8 {
+                app.swipeUp()
+                swipes += 1
+            }
+            XCTAssertTrue(storageConfirm.exists, "保存モード選択の確定ボタンまでスクロールできること")
             storageConfirm.tap()
             sleep(2) // let the sheet finish dismissing before tapping below it
         } else if !backupTab.exists {
