@@ -69,6 +69,41 @@ jobs:
           xcrun simctl bootstatus "$udid"
           echo "udid=$udid" >> "$GITHUB_OUTPUT"
 
+      # CI simulator runtimes don't ship sample photos (run #4 found an
+      # empty library), so seed a deterministic set of pleasant gradient
+      # images for the picker/upload/gallery shots.
+      - name: Seed photo library with generated images
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet --break-system-packages pillow \
+            || python3 -m pip install --quiet pillow
+          python3 - <<'EOF'
+          from PIL import Image, ImageDraw, ImageFilter
+          import colorsys, random, os
+          random.seed(7)
+          os.makedirs("seed-media", exist_ok=True)
+          W, H = 1512, 2016
+          for i in range(8):
+              h1 = random.random()
+              h2 = (h1 + 0.18) % 1.0
+              c1 = tuple(int(c * 255) for c in colorsys.hsv_to_rgb(h1, 0.55, 0.95))
+              c2 = tuple(int(c * 255) for c in colorsys.hsv_to_rgb(h2, 0.65, 0.75))
+              strip = Image.new("RGB", (1, H))
+              for y in range(H):
+                  t = y / H
+                  strip.putpixel((0, y), tuple(int(c1[k] * (1 - t) + c2[k] * t) for k in range(3)))
+              img = strip.resize((W, H))
+              draw = ImageDraw.Draw(img, "RGBA")
+              for _ in range(12):
+                  r = random.randint(80, 300)
+                  x, y = random.randint(0, W), random.randint(0, H)
+                  draw.ellipse([x - r, y - r, x + r, y + r],
+                               fill=(255, 255, 255, random.randint(20, 60)))
+              img = img.filter(ImageFilter.GaussianBlur(6))
+              img.save(f"seed-media/photo{i + 1}.jpg", quality=88)
+          EOF
+          xcrun simctl addmedia ${{ steps.sim.outputs.udid }} seed-media/*.jpg
+
       # The classic marketing status bar: 9:41, full battery and signal.
       - name: Override status bar
         run: >

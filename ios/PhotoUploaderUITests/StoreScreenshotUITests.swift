@@ -92,12 +92,25 @@ final class StoreScreenshotUITests: XCTestCase {
         XCTAssertTrue(libraryButton.waitForExistence(timeout: 15))
         libraryButton.tap()
 
+        // The workflow pre-grants photo access, but if the grant didn't take
+        // effect the system permission dialog appears here — answer it.
+        tapSpringboardAlertButton(
+            ["Allow Full Access", "Allow Access to All Photos",
+             "フルアクセスを許可", "すべての写真へのアクセスを許可"],
+            timeout: 5
+        )
+
         let assetCells = app.descendants(matching: .any)
             .matching(identifier: "library-asset-cell")
-        XCTAssertTrue(
-            assetCells.firstMatch.waitForExistence(timeout: 30),
-            "ライブラリに写真があること(シミュレータ標準のサンプル写真を想定)"
-        )
+        if !assetCells.firstMatch.waitForExistence(timeout: 30) {
+            attachScreenshot(named: "99-picker-failure-screen")
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name = "99-picker-failure-hierarchy"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+            XCTFail("ライブラリに写真が表示されなかった(99-picker-failure-* 添付を確認。権限拒否画面か空ライブラリかが写っている)")
+            return
+        }
         sleep(3) // thumbnails
         let selectionCount = min(assetCells.count, 6)
         XCTAssertGreaterThan(selectionCount, 0)
@@ -149,14 +162,27 @@ final class StoreScreenshotUITests: XCTestCase {
     /// Springboard rather than the app. Label depends on the simulator's
     /// system language; nothing to do if the alert never shows.
     private func allowNotificationAlertIfPresent() {
+        tapSpringboardAlertButton(["Allow", "許可"], timeout: 5)
+    }
+
+    /// Polls Springboard for an alert button with any of the given labels
+    /// (system dialogs live outside the app process) and taps the first
+    /// match. Returns false if none appeared before the timeout.
+    @discardableResult
+    private func tapSpringboardAlertButton(_ labels: [String], timeout: TimeInterval) -> Bool {
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        for label in ["Allow", "許可"] {
-            let button = springboard.buttons[label]
-            if button.waitForExistence(timeout: 5) {
-                button.tap()
-                return
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            for label in labels {
+                let button = springboard.buttons[label]
+                if button.exists {
+                    button.tap()
+                    return true
+                }
             }
-        }
+            sleep(1)
+        } while Date() < deadline
+        return false
     }
 
     private func attachScreenshot(named name: String) {
