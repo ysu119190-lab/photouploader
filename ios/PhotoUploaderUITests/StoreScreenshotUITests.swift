@@ -48,14 +48,28 @@ final class StoreScreenshotUITests: XCTestCase {
         loginButton.tap()
 
         // ⑤ 保存モードの選択 — the one-time chooser right after first sign-in.
+        // Poll for either the chooser or the signed-in tab bar so a missing
+        // chooser (already answered / presentation race) doesn't kill the
+        // whole capture run; if neither shows up, sign-in itself failed —
+        // attach the screen and hierarchy as evidence before failing.
         let storageConfirm = app.buttons["この設定ではじめる"]
-        XCTAssertTrue(
-            storageConfirm.waitForExistence(timeout: 45),
-            "サインイン後に保存モード選択が表示されること(出ない場合はデモアカウントの認証情報や疎通を確認)"
-        )
-        sleep(2)
-        attachScreenshot(named: "05-storage-mode-choice")
-        storageConfirm.tap()
+        let backupTab = app.tabBars.buttons["バックアップ"]
+        let signInDeadline = Date().addingTimeInterval(60)
+        while Date() < signInDeadline && !storageConfirm.exists && !backupTab.exists {
+            sleep(2)
+        }
+        if storageConfirm.exists {
+            sleep(2)
+            attachScreenshot(named: "05-storage-mode-choice")
+            storageConfirm.tap()
+        } else if !backupTab.exists {
+            attachScreenshot(named: "99-signin-failure-screen")
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name = "99-signin-failure-hierarchy"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+            XCTFail("サインイン後の画面に遷移できなかった(99-signin-failure-* 添付を確認。認証エラーならログイン画面の赤いメッセージに理由が写っている)")
+        }
 
         // ② アップロード進捗 — pick several items in the in-app library
         // picker (photo access is pre-granted via `simctl privacy`).
