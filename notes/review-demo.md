@@ -73,12 +73,16 @@ aws cognito-idp admin-set-user-password \
 >
 > 2. On the sign-in screen, log in with the demo account provided in the
 >    App Review sign-in information (email/password above).
-> 3. Tap "写真・動画を選択" (top right) to pick photos — they upload to the
+> 3. After the first sign-in, a one-time storage-mode chooser sheet appears.
+>    Keep the default ("標準モード") and tap the confirm button
+>    ("この設定ではじめる"). The fees it explains are AWS storage fees billed
+>    to the user's own AWS account — the app itself has no in-app purchases.
+> 4. Tap "写真・動画を選択" (top right) to pick photos — they upload to the
 >    demo S3 bucket. The "保存済み" tab lists uploaded items; tapping one
 >    shows it full-screen with a "save to device" (restore) option.
-> 4. Account deletion (guideline 5.1.1(v)) is available from the
+> 5. Account deletion (guideline 5.1.1(v)) is available from the
 >    "アカウント" menu (top left) → "アカウントを削除".
-> 5. Uploaded items can be deleted from the "保存済み" tab via "選択" —
+> 6. Uploaded items can be deleted from the "保存済み" tab via "選択" —
 >    they move to a server-side trash that auto-expires after 30 days.
 >
 > Notes:

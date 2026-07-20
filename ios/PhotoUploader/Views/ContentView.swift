@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var accountDeletionError: String?
     @State private var isShowingLibraryPicker = false
     @State private var isShowingCamera = false
+    @State private var isShowingStorageModeSetup = false
 
     var body: some View {
         ZStack {
@@ -32,6 +33,23 @@ struct ContentView: View {
                             .tabItem {
                                 Label("保存済み", systemImage: "photo.stack")
                             }
+                    }
+                    .onAppear {
+                        // One-time storage-mode choice after the first
+                        // sign-in. The key is written only when the user
+                        // picks a mode, so its absence means "never chosen"
+                        // (existing users who already picked are not asked).
+                        if UserDefaults.standard.string(forKey: "storage-mode") == nil {
+                            isShowingStorageModeSetup = true
+                        }
+                    }
+                    .sheet(isPresented: $isShowingStorageModeSetup) {
+                        NavigationStack {
+                            StorageModeView(isInitialSetup: true) {
+                                isShowingStorageModeSetup = false
+                            }
+                        }
+                        .interactiveDismissDisabled()
                     }
                 }
             }
