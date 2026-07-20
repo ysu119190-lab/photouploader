@@ -121,7 +121,7 @@
 - [x] **プライバシーポリシー作成**(App Store審査で必須)— 下書き `notes/privacy-policy.md`(Web版 `docs/privacy.html`)。角かっこの事業者名・連絡先を埋めれば完成
 - [x] **App Privacy(栄養ラベル)申告の整理** — 回答内容を `notes/app-privacy-label.md` にまとめ済み(App Store Connectに転記するだけ。提出直前にGoogleの開示ガイドで最新を再確認)
 - [x] **非パーソナライズ広告(NPA)設定の実装** — 全広告リクエストが `AdsConfig.makeRequest()`(npa=1)経由に。ATT不要・「トラッキングなし」申告が可能に。AdMob管理画面のEU同意設定のみ本番化時に要対応
-- [ ] **App Store審査対応**: 審査用デモ環境 — 手順・CLIコマンド・Review Notes文面は `notes/review-demo.md` に準備済み(2026-07-15)。スタックのデプロイとテストアカウント作成はユーザー作業(提出数日前に実施)
+- [x] **App Store審査対応**: 審査用デモ環境 — **準備完了(2026-07-19〜20)**。デモスタック(`photouploader-review-demo` / ap-northeast-1)デプロイ済み・テストアカウント作成とログイン〜アップロード〜閲覧の動作確認済み・Review Notes の接続設定も実値反映済み(`notes/review-demo.md`)。提出時の残作業は同ファイル§6参照(ASCのApp Review情報への記入と、デモバケットへ数枚アップロードしておくことの2点のみ)
 - [ ] ストア素材 — 名前案・サブタイトル・紹介文・キーワードは `notes/store-listing.md` に下書き済み(2026-07-15)。残りは**スクリーンショット撮影**(デモスタック構築後にiPhone 16 Pro Maxシミュレータで手動、撮影リストは同ファイル§7)と名前の最終決定
 
 ### 審査・公開準備の追加課題(2026-07-09 洗い出し)
