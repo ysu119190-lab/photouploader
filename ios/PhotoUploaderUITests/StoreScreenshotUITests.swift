@@ -96,26 +96,38 @@ final class StoreScreenshotUITests: XCTestCase {
         // effect the system permission dialog appears here — answer it.
         tapSpringboardAlertButton(
             ["Allow Full Access", "Allow Access to All Photos",
-             "フルアクセスを許可", "すべての写真へのアクセスを許可"],
-            timeout: 5
+             "フルアクセスを許可", "すべての写真へのアクセスを許可", "Allow", "許可"],
+            timeout: 8
         )
 
         let assetCells = app.descendants(matching: .any)
             .matching(identifier: "library-asset-cell")
-        if !assetCells.firstMatch.waitForExistence(timeout: 30) {
-            attachScreenshot(named: "99-picker-failure-screen")
-            let hierarchy = XCTAttachment(string: app.debugDescription)
-            hierarchy.name = "99-picker-failure-hierarchy"
-            hierarchy.lifetime = .keepAlways
-            add(hierarchy)
-            XCTFail("ライブラリに写真が表示されなかった(99-picker-failure-* 添付を確認。権限拒否画面か空ライブラリかが写っている)")
+        if assetCells.firstMatch.waitForExistence(timeout: 30) {
+            sleep(3) // thumbnails
+            let selectionCount = min(assetCells.count, 6)
+            for index in 0..<selectionCount {
+                assetCells.element(boundBy: index).tap()
+            }
+        } else if app.staticTexts["写真がありません"].exists {
+            dumpPickerDiagnostics(app: app)
+            XCTFail("写真ライブラリが空(ワークフローの addmedia が効いていない)")
             return
-        }
-        sleep(3) // thumbnails
-        let selectionCount = min(assetCells.count, 6)
-        XCTAssertGreaterThan(selectionCount, 0)
-        for index in 0..<selectionCount {
-            assetCells.element(boundBy: index).tap()
+        } else {
+            // The cells render but their accessibility identifier may not be
+            // queryable on this runtime — fall back to tapping grid slots by
+            // position (4 adaptive columns under the sort controls).
+            for (dx, dy) in [(0.125, 0.22), (0.375, 0.22), (0.625, 0.22),
+                             (0.875, 0.22), (0.125, 0.32), (0.375, 0.32)] {
+                app.coordinate(withNormalizedOffset: CGVector(dx: dx, dy: dy)).tap()
+            }
+            let selectedTitle = app.staticTexts
+                .matching(NSPredicate(format: "label CONTAINS %@", "件を選択中"))
+                .firstMatch
+            if !selectedTitle.waitForExistence(timeout: 5) {
+                dumpPickerDiagnostics(app: app)
+                XCTFail("写真セルを選択できなかった(ログの PICKER-DEBUG と 99-picker-failure-* 添付を確認)")
+                return
+            }
         }
         app.buttons["アップロード"].tap()
 
@@ -183,6 +195,24 @@ final class StoreScreenshotUITests: XCTestCase {
             sleep(1)
         } while Date() < deadline
         return false
+    }
+
+    /// Evidence for picker failures. Printed to the console on purpose:
+    /// this session's proxy can't download artifacts, but job logs are
+    /// readable, so PICKER-DEBUG lines are the reliable channel.
+    private func dumpPickerDiagnostics(app: XCUIApplication) {
+        attachScreenshot(named: "99-picker-failure-screen")
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        if springboard.alerts.count > 0 {
+            print("PICKER-DEBUG springboard alert: \(springboard.alerts.firstMatch.debugDescription)")
+        }
+        print("PICKER-DEBUG hierarchy begin")
+        print(app.debugDescription)
+        print("PICKER-DEBUG hierarchy end")
+        let hierarchy = XCTAttachment(string: app.debugDescription)
+        hierarchy.name = "99-picker-failure-hierarchy"
+        hierarchy.lifetime = .keepAlways
+        add(hierarchy)
     }
 
     private func attachScreenshot(named name: String) {

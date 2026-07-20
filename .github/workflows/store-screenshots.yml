@@ -131,7 +131,7 @@ jobs:
           set -euo pipefail
           xcrun simctl install ${{ steps.sim.outputs.udid }} \
             ios/DerivedData/Build/Products/Debug-iphonesimulator/PhotoUploader.app
-          xcrun simctl privacy ${{ steps.sim.outputs.udid }} grant photos \
+          xcrun simctl privacy ${{ steps.sim.outputs.udid }} grant all \
             io.github.ysu119190-lab.photouploader
 
       - name: Capture screenshots
