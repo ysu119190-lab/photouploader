@@ -58,10 +58,18 @@ final class StoreScreenshotUITests: XCTestCase {
         while Date() < signInDeadline && !storageConfirm.exists && !backupTab.exists {
             sleep(2)
         }
+        // The chooser sheet animates in an instant *after* the tab view
+        // appears (run #2 hit a list button underneath it and failed on
+        // "not hittable"), so even when the tab bar wins the race, give the
+        // sheet time to present.
+        if backupTab.exists && !storageConfirm.exists {
+            _ = storageConfirm.waitForExistence(timeout: 10)
+        }
         if storageConfirm.exists {
             sleep(2)
             attachScreenshot(named: "05-storage-mode-choice")
             storageConfirm.tap()
+            sleep(2) // let the sheet finish dismissing before tapping below it
         } else if !backupTab.exists {
             attachScreenshot(named: "99-signin-failure-screen")
             let hierarchy = XCTAttachment(string: app.debugDescription)
