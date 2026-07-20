@@ -4,14 +4,38 @@ import SwiftUI
 /// and trade-offs of each mode spelled out. The choice applies to photos
 /// uploaded afterwards; previously uploaded photos are unaffected.
 struct StorageModeView: View {
+    /// True when shown as the one-time chooser right after the first
+    /// sign-in: adds an intro and a confirm button at the bottom.
+    var isInitialSetup = false
+    /// Called when the user confirms their choice in initial-setup mode.
+    var onComplete: (() -> Void)?
+
     @AppStorage("storage-mode") private var rawMode = StorageMode.standard.rawValue
 
     var body: some View {
         List {
             Section {
-                Text("写真の保存方法を選べます。いつでも変更でき、変更後にアップロードする写真に適用されます(すでにアップロード済みの写真はそのままです)。")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                if isInitialSetup {
+                    Text("はじめに、写真の保存方法を選んでください。あとから画面右上の「保存モード」(歯車マーク)でいつでも変更できます。変更はそれ以降にアップロードする写真に適用されます。")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("写真の保存方法を選べます。いつでも変更でき、変更後にアップロードする写真に適用されます(すでにアップロード済みの写真はそのままです)。")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "yensign.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(.orange)
+                    Text("ここに表示される料金は、このアプリへの支払いではありません。写真の保存先であるあなた自身のAWSアカウントに、AWSの利用料として直接請求されます(保存量に応じた従量課金)。このアプリにアプリ内課金や月額プランはありません。")
+                        .font(.callout)
+                }
+                .padding(.vertical, 4)
+                .listRowBackground(Color.orange.opacity(0.12))
             }
 
             ForEach(StorageMode.allCases) { mode in
@@ -34,8 +58,26 @@ struct StorageModeView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            if isInitialSetup {
+                Section {
+                    Button {
+                        // Persist even when the user keeps the preselected
+                        // default — the key's presence marks setup as done.
+                        StorageModeStore.current = StorageMode(rawValue: rawMode) ?? .standard
+                        onComplete?()
+                    } label: {
+                        Text("この設定ではじめる")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                }
+            }
         }
-        .navigationTitle("保存モード")
+        .navigationTitle(isInitialSetup ? "保存モードの選択" : "保存モード")
         .navigationBarTitleDisplayMode(.inline)
     }
 
