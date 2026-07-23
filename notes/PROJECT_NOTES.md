@@ -2,7 +2,7 @@
 
 開発の記録。実装済みの機能、発生した課題と対応、今後のタスクをここにまとめる。
 
-最終更新: 2026-07-19
+最終更新: 2026-07-21
 
 ---
 
@@ -118,7 +118,7 @@
   - ~~**app-ads.txt をドメイン直下に置く**~~ — **完了(2026-07-20)**。`ysu119190-lab.github.io` リポジトリに配置しPages有効化。`https://ysu119190-lab.github.io/app-ads.txt` で1行表示されることをブラウザで確認済み。docs/ 内のコピーはパス付きURLなので保険として維持
   - ストア公開後: AdMobのアプリをApp Storeリスティングに紐づけ → app-ads.txtの確認クロールを実行
   - 提出前にSKAdNetworkリストをGoogle公式の最新と照合(https://developers.google.com/admob/ios/3p-skadnetworks — 開発環境からは取得不可だったため既知の公式リストを使用)
-- [x] **プライバシーポリシー作成**(App Store審査で必須)— 下書き `notes/privacy-policy.md`(Web版 `docs/privacy.html`)。角かっこの事業者名・連絡先を埋めれば完成
+- [x] **プライバシーポリシー作成**(App Store審査で必須)— **完成(2026-07-21)**。`docs/privacy.html` の角かっこ(提供者名=GitHubハンドル `ysu119190-lab`・問い合わせ窓口=GitHub Issues・最終更新日=2026-07-21)を実値で記入済み。GitHub Pages 有効化後の `https://ysu119190-lab.github.io/photouploader/privacy.html` を審査の「プライバシーポリシーURL」に使用
 - [x] **App Privacy(栄養ラベル)申告の整理** — 回答内容を `notes/app-privacy-label.md` にまとめ済み(App Store Connectに転記するだけ。提出直前にGoogleの開示ガイドで最新を再確認)
 - [x] **非パーソナライズ広告(NPA)設定の実装** — 全広告リクエストが `AdsConfig.makeRequest()`(npa=1)経由に。ATT不要・「トラッキングなし」申告が可能に。AdMob管理画面のEU同意設定のみ本番化時に要対応
 - [x] **App Store審査対応**: 審査用デモ環境 — **準備完了(2026-07-19〜20)**。デモスタック(`photouploader-review-demo` / ap-northeast-1)デプロイ済み・テストアカウント作成とログイン〜アップロード〜閲覧の動作確認済み・Review Notes の接続設定も実値反映済み(`notes/review-demo.md`)。提出時の残作業は同ファイル§6参照(ASCのApp Review情報への記入と、デモバケットへ数枚アップロードしておくことの2点のみ)
