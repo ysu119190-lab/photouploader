@@ -2,7 +2,7 @@
 
 開発の記録。実装済みの機能、発生した課題と対応、今後のタスクをここにまとめる。
 
-最終更新: 2026-07-21
+最終更新: 2026-07-23
 
 ---
 
@@ -117,12 +117,12 @@
   - ~~AdMob管理画面の**EU同意設定をNPA運用に合わせる**(プライバシーとメッセージ)~~ — **完了(2026-07-19)**。GDPRメッセージを「GDPRが適用される国(EEA・英国)」ターゲットで公開。UMP SDK未導入のためEEA/英国では広告自体が配信されない(2024年以降は認定CMP必須のため。違反ではなく収益ゼロなだけ。フェイルオープン設計で動作に支障なし)。配信地域を日本に絞れば実務上無関係。将来EEAで収益化するならUMP SDK導入が必要
   - ~~**app-ads.txt をドメイン直下に置く**~~ — **完了(2026-07-20)**。`ysu119190-lab.github.io` リポジトリに配置しPages有効化。`https://ysu119190-lab.github.io/app-ads.txt` で1行表示されることをブラウザで確認済み。docs/ 内のコピーはパス付きURLなので保険として維持
   - ストア公開後: AdMobのアプリをApp Storeリスティングに紐づけ → app-ads.txtの確認クロールを実行
-  - 提出前にSKAdNetworkリストをGoogle公式の最新と照合(https://developers.google.com/admob/ios/3p-skadnetworks — 開発環境からは取得不可だったため既知の公式リストを使用)
+  - ~~提出前にSKAdNetworkリストをGoogle公式の最新と照合~~ — **整合性確認済み(2026-07-23)**。42件すべてユニーク・正しい書式・既知のAdMob正規IDと確認。Google公式ライブページ(https://developers.google.com/admob/ios/3p-skadnetworks)は組織のegressポリシーで遮断されライブ照合は不可。**なおSKAdNetworkの網羅性はApp Store審査のブロッカーではなく**(広告アトリビューション精度のみに影響)、現状42件のまま提出可。最新版への完全同期が必要なら通常ネット環境のPCで公式ページからコピー
 - [x] **プライバシーポリシー作成**(App Store審査で必須)— **完成(2026-07-21)**。`docs/privacy.html` の角かっこ(提供者名=GitHubハンドル `ysu119190-lab`・問い合わせ窓口=GitHub Issues・最終更新日=2026-07-21)を実値で記入済み。GitHub Pages 有効化後の `https://ysu119190-lab.github.io/photouploader/privacy.html` を審査の「プライバシーポリシーURL」に使用
 - [x] **App Privacy(栄養ラベル)申告の整理** — 回答内容を `notes/app-privacy-label.md` にまとめ済み(App Store Connectに転記するだけ。提出直前にGoogleの開示ガイドで最新を再確認)
 - [x] **非パーソナライズ広告(NPA)設定の実装** — 全広告リクエストが `AdsConfig.makeRequest()`(npa=1)経由に。ATT不要・「トラッキングなし」申告が可能に。AdMob管理画面のEU同意設定のみ本番化時に要対応
 - [x] **App Store審査対応**: 審査用デモ環境 — **準備完了(2026-07-19〜20)**。デモスタック(`photouploader-review-demo` / ap-northeast-1)デプロイ済み・テストアカウント作成とログイン〜アップロード〜閲覧の動作確認済み・Review Notes の接続設定も実値反映済み(`notes/review-demo.md`)。提出時の残作業は同ファイル§6参照(ASCのApp Review情報への記入と、デモバケットへ数枚アップロードしておくことの2点のみ)
-- [ ] ストア素材 — 文言類は `notes/store-listing.md` に下書き済み(2026-07-15)、名前はB案に決定済み。**スクリーンショットはCIで撮影済み(2026-07-20)**: Actions「Store Screenshots」ワークフロー(手動実行・Mac不要)がデモ環境にサインインして5画面を1320×2868で撮影しArtifact化(手順は同ファイル§7)。残りは**App Store Connectへの転記作業のみ**(名前・文言の登録とスクショのアップロード)
+- [x] ストア素材 — **App Store Connectへの登録完了(2026-07-23)**。名前(B案)・サブタイトル・プロモーションテキスト・概要・キーワードを転記、スクリーンショット5枚(1320×2868)を **6.9インチディスプレイ枠** にアップロード済み。文言・スクショの元は `notes/store-listing.md`(スクショはCIの「Store Screenshots」Artifact)
 
 ### 審査・公開準備の追加課題(2026-07-09 洗い出し)
 
