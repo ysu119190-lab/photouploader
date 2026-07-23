@@ -84,9 +84,10 @@ Apple の定義では、**「デバイス外に送信され、開発者または
 - [x] プライバシーポリシーに AdMob の収集について記載済み(`notes/privacy-policy.md` §第三者サービス)
 - [x] ポリシーの「アカウント削除」をアプリ内削除の実装に合わせて更新(2026-07-09)
 - [x] 案Aで行く場合: **NPA 設定の実装** — アプリ側は実装済み(§2)。AdMob 管理画面側の設定のみ本番化時に
-- [ ] App Store Connect の「プライバシーポリシー URL」に GitHub Pages の
-      `https://<ユーザー名>.github.io/photouploader/privacy.html` を設定(Pages 有効化が先)
-- [ ] 提出直前に Google のデータ開示ガイドと Xcode の Privacy Report で最終確認
+- [x] App Store Connect の「プライバシーポリシー URL」に GitHub Pages の
+      `https://ysu119190-lab.github.io/photouploader/privacy.html` を設定(2026-07-23)
+- [x] §3 の表を App Store Connect の「App のプライバシー」に転記(2026-07-23。トラッキング「なし」でプレビュー確認)
+- [ ] 提出直前に Google のデータ開示ガイドと Xcode の Privacy Report で最終確認(SDK更新時のみ再確認)
 
 ## 5. App Store Connect での入力手順
 
