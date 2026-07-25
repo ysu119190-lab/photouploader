@@ -7,7 +7,13 @@
 ## 状況の読み解き
 
 これは **2.1(a) Information Needed(情報の追加要求）**であり、ビルドの作り直しは不要。
-Resolution Center で情報（＝デモ用QR画像）を返信すれば、同じビルド 1.0(3) の審査が再開する。
+本来は Resolution Center で情報（＝デモ用QR画像）を返信すれば同じビルド 1.0(3) の審査が再開する。
+
+**※ 追記(2026-07-25): 提出(Submission)を誤って削除してしまった場合**
+ASC の「提出内容」でステータスが「削除済み」になっているなら、審査から取り下げられた状態。
+メッセージで返信する導線は使えないので、**新しい提出(Submission)を作り直して再提出**する
+（下記 §7）。ビルドは既存の 1.0(3) をそのまま使え、アップロードは不要。デモ環境・QR・
+アカウントは全てそのまま有効。
 
 本アプリの初回セットアップ画面（接続先の設定）は **QRスキャン / JSON貼り付け / 手動入力**の
 3択で、先頭がQRスキャン。審査員はQRスキャン導線を試したが読み取る画像が無く、
@@ -36,8 +42,13 @@ QRのペイロードは `AppConfigJson` の文字列そのまま（アプリは�
 
 ## Resolution Center への返信（英語・そのまま貼れる）
 
-> Thank you for the review. Here is the demo QR code you requested, plus a
-> paste-based alternative in case scanning an on-screen code is inconvenient.
+> This is a resubmission of version 1.0 (build 3), previously reviewed under
+> Submission ID 9bb7b427-c5db-457b-82b0-ef2093d88f45, addressing the
+> Guideline 2.1(a) request for a demo QR code. (The prior submission was
+> withdrawn on our side; no app changes were made.)
+>
+> Here is the demo QR code you requested, plus a paste-based alternative in
+> case scanning an on-screen code is inconvenient.
 >
 > This app backs up the user's photos/videos to the user's *own* AWS account
 > (a "bring your own cloud" model, like self-hosted server clients). We operate
@@ -77,4 +88,24 @@ QRのペイロードは `AppConfigJson` の文字列そのまま（アプリは�
 > https://github.com/ysu119190-lab/photouploader
 >
 > Please let us know if anything else is needed to complete the assessment.
+
+## 7. 提出(Submission)を削除してしまった場合の再提出手順
+
+ASC の「提出内容」でステータスが **「削除済み」**＝審査から取り下げられている。
+Resolution Center のやり取りも消えるが、**バージョン1.0・ビルド(3)・デモ環境・QR・
+テストアカウントは全て残っている**ので、新しい提出を作り直すだけでよい。
+
+1. アプリ → バージョン1.0ページを開く（提出削除で編集可能な状態に戻っているはず）。
+2. **「App Review に関する情報」を整える**:
+   - QR画像 `photouploader-review-demo-qr.png` を添付
+   - メモ(Review Notes)= §4 の英文（冒頭に「これは前回 Submission ID 9bb7b427… の
+     再提出」と明記済み）を貼る
+   - サインイン情報 `review-demo@example.com` / `ReviewDemo2026!` が入っているか確認
+   - 連絡先情報を確認
+3. **新しい提出を作成 → バージョン1.0(ビルド3)を追加 → 審査に提出**。
+   新しいビルドのアップロードは不要（既存ビルド3を使い回す）。
+4. 新しい Submission ID が発番される。§4冒頭で旧IDを引用しているので審査員は経緯を追える。
+
+> ⚠️ メールの「Reply to this message in App Store Connect」はメール返信では届かない。
+> やり取りが消えている以上、返信ではなく上記の**再提出**で対応する。
 </content>
