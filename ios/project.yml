@@ -30,8 +30,10 @@ targets:
     settings:
       base:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        # Marketing version (CFBundleShortVersionString). Bump for each App
-        # Store release; the build number comes from the CI run number.
+        # Marketing version. Bump for each App Store release; the build
+        # number comes from the CI run number. Wired into the bundle via
+        # CFBundleShortVersionString below (XcodeGen's generated Info.plist
+        # otherwise hardcodes "1.0" and ignores this setting).
         MARKETING_VERSION: "1.0.1"
         # Registered App ID (App Store Connect). Keep exactly in sync.
         PRODUCT_BUNDLE_IDENTIFIER: io.github.ysu119190-lab.photouploader
@@ -44,6 +46,9 @@ targets:
       path: PhotoUploader/Info.plist
       properties:
         CFBundleDisplayName: PhotoUploader
+        # Expanded from the MARKETING_VERSION build setting at build time so
+        # the App Store gets the real version (1.0.1), not XcodeGen's "1.0".
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
