@@ -21,14 +21,12 @@ enum MediaSaverError: LocalizedError {
 /// Downloads an uploaded photo/video via its presigned GET URL and saves it
 /// back into the device photo library — the "restore" side of the backup.
 enum MediaSaver {
-    static func saveToPhotoLibrary(_ photo: RemotePhoto) async throws {
+    /// Downloads the object to a temporary file named with the key's
+    /// extension so the system recognizes the format. The caller owns the
+    /// returned file and is responsible for deleting it.
+    static func downloadToTemporaryFile(_ photo: RemotePhoto) async throws -> URL {
         guard let url = photo.imageURL else {
             throw MediaSaverError.invalidURL
-        }
-
-        let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
-        guard status == .authorized || status == .limited else {
-            throw MediaSaverError.notAuthorized
         }
 
         let (downloadedURL, response) = try await URLSession.shared.download(from: url)
@@ -39,12 +37,22 @@ enum MediaSaver {
             )
         }
 
-        // Re-stage with the object key's extension so Photos recognizes the
-        // format (the download temp file has none).
+        // Re-stage with the object key's extension so Photos and the share
+        // sheet recognize the format (the download temp file has none).
         let ext = (photo.key as NSString).pathExtension
         let staged = FileManager.default.temporaryDirectory
             .appendingPathComponent("\(UUID().uuidString).\(ext)")
         try FileManager.default.moveItem(at: downloadedURL, to: staged)
+        return staged
+    }
+
+    static func saveToPhotoLibrary(_ photo: RemotePhoto) async throws {
+        let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+        guard status == .authorized || status == .limited else {
+            throw MediaSaverError.notAuthorized
+        }
+
+        let staged = try await downloadToTemporaryFile(photo)
         defer { try? FileManager.default.removeItem(at: staged) }
 
         try await PHPhotoLibrary.shared().performChanges {
