@@ -30,6 +30,9 @@ targets:
     settings:
       base:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # Marketing version (CFBundleShortVersionString). Bump for each App
+        # Store release; the build number comes from the CI run number.
+        MARKETING_VERSION: "1.0.1"
         # Registered App ID (App Store Connect). Keep exactly in sync.
         PRODUCT_BUNDLE_IDENTIFIER: io.github.ysu119190-lab.photouploader
         # Must live at the target level: XcodeGen's iOS platform preset sets
