@@ -48,10 +48,20 @@ struct GalleryView: View {
                 }
 
                 if let errorMessage = viewModel.errorMessage {
-                    Text(errorMessage)
-                        .font(.callout)
-                        .foregroundStyle(.red)
-                        .padding()
+                    VStack(spacing: 12) {
+                        Text(errorMessage)
+                            .font(.callout)
+                            .foregroundStyle(.red)
+                            .multilineTextAlignment(.center)
+                        Button {
+                            Task { await viewModel.refresh() }
+                        } label: {
+                            Label("再読み込み", systemImage: "arrow.clockwise")
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
                 }
             }
             .overlay {
@@ -234,6 +244,9 @@ private struct PhotoDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var isSaving = false
     @State private var saveResult: String?
+    @State private var saveSuccessCount = 0
+    @State private var isPreparingShare = false
+    @State private var shareItem: ShareFile?
 
     var body: some View {
         NavigationStack {
@@ -270,6 +283,18 @@ private struct PhotoDetailView: View {
                         dismiss()
                     }
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        prepareShare()
+                    } label: {
+                        if isPreparingShare {
+                            ProgressView()
+                        } else {
+                            Label("共有", systemImage: "square.and.arrow.up")
+                        }
+                    }
+                    .disabled(isPreparingShare)
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button {
                         saveToLibrary()
@@ -281,6 +306,14 @@ private struct PhotoDetailView: View {
                         }
                     }
                     .disabled(isSaving)
+                }
+            }
+            .sensoryFeedback(.success, trigger: saveSuccessCount)
+            .sheet(item: $shareItem) { item in
+                ActivityView(activityItems: [item.url]) {
+                    // The share sheet copies what it needs; drop the temp file.
+                    try? FileManager.default.removeItem(at: item.url)
+                    shareItem = nil
                 }
             }
             .alert(
@@ -305,7 +338,21 @@ private struct PhotoDetailView: View {
             defer { isSaving = false }
             do {
                 try await MediaSaver.saveToPhotoLibrary(photo)
+                saveSuccessCount += 1
                 saveResult = "写真アプリに保存しました"
+            } catch {
+                saveResult = error.localizedDescription
+            }
+        }
+    }
+
+    private func prepareShare() {
+        isPreparingShare = true
+        Task { @MainActor in
+            defer { isPreparingShare = false }
+            do {
+                let url = try await MediaSaver.downloadToTemporaryFile(photo)
+                shareItem = ShareFile(url: url)
             } catch {
                 saveResult = error.localizedDescription
             }

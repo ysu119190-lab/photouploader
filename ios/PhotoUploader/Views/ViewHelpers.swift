@@ -1,4 +1,30 @@
 import SwiftUI
+import UIKit
+
+/// A prepared file ready to hand to the share sheet. Identifiable so it can
+/// drive `sheet(item:)` once the download finishes.
+struct ShareFile: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
+/// Thin wrapper around `UIActivityViewController` (the system share sheet),
+/// which SwiftUI has no native equivalent of for arbitrary file URLs.
+struct ActivityView: UIViewControllerRepresentable {
+    let activityItems: [Any]
+    var onComplete: (() -> Void)?
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(
+            activityItems: activityItems,
+            applicationActivities: nil
+        )
+        controller.completionWithItemsHandler = { _, _, _, _ in onComplete?() }
+        return controller
+    }
+
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
+}
 
 extension Binding where Value == Bool {
     /// Presence binding for `alert(isPresented:)` driven by an optional

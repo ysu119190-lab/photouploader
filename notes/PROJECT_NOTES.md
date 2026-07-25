@@ -139,6 +139,14 @@
 1.0が販売中でマーケティングURL欄がロック→編集可能にするため小アップデートを出す。iOSはメタデータのみ更新不可(必ずビルド+審査)。
 
 - [x] **マーケティングバージョンを1.0.1に**(2026-07-25)— `ios/project.yml` のアプリターゲット設定に `MARKETING_VERSION: "1.0.1"` を追加(従来はXcodeデフォルトの1.0だった)。ビルド番号は従来どおりCIの run_number 採番
+- [x] **小改善を同梱(ユーザー向け変更を用意)**(2026-07-25)— ①保存済み写真・動画の**「共有」ボタン**(拡大表示に追加。システムの共有シート。`MediaSaver.downloadToTemporaryFile` を切り出し、`ViewHelpers.swift` に `ShareFile`/`ActivityView` を追加)②**触覚フィードバック**(アップロードバッチ完了=`UploadViewModel.batchFinishedTick`+`.sensoryFeedback`、端末保存成功時。iOS17+の `.sensoryFeedback` 使用)③ギャラリー読み込み失敗時の**「再読み込み」ボタン**(従来は赤字テキストのみ)。いずれもPRのCI(ios-simulator-test)でビルド検証
+  - **今回のアップデート内容(What's New)案**:
+    ```
+    ・保存した写真・動画を他のアプリへ「共有」できるようになりました
+    ・アップロード完了時・端末への保存時に触覚フィードバックを追加しました
+    ・一覧の読み込みに失敗したときに「再読み込み」ボタンを表示するようにしました
+    ・その他、軽微な改善を行いました
+    ```
 - [ ] **1.0.1をmainへマージ**(あなた/PR依頼時)— 作業ブランチ `claude/app-store-review-response-iyry08` → PR → main
 - [ ] **TestFlightワークフローを手動実行しビルドをアップロード**(あなた)— Actions → TestFlight → Run workflow(mainから)
 - [ ] **ASCで1.0.1バージョンを作成し提出**(あなた)— `(+) バージョンまたはプラットフォーム` → 1.0.1 → **マーケティングURLに `https://ysu119190-lab.github.io/photouploader/`** → アップしたビルドを選択 → 「今回のアップデート内容」記入 → 審査に提出。※URLだけの変更は「ユーザー向け変更なし」と見られうるので小改善の同梱が無難

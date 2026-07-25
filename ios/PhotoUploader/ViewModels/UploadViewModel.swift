@@ -18,6 +18,8 @@ final class UploadViewModel: ObservableObject {
     private static var didRequestNotificationAuth = false
     /// Finished batches, newest first, persisted across launches.
     @Published private(set) var history: [UploadBatchSummary] = UploadHistoryStore.load()
+    /// Bumped once each time a batch finishes; drives the completion haptic.
+    @Published private(set) var batchFinishedTick = 0
 
     init() {
         // Restore the last batch's rows so a relaunch doesn't blank the
@@ -208,6 +210,7 @@ final class UploadViewModel: ObservableObject {
                 )
             )
             history = UploadHistoryStore.load()
+            batchFinishedTick += 1
             persistItems()
             notifyBatchFinishedIfBackgrounded()
         }

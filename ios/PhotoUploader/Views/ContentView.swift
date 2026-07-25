@@ -151,6 +151,7 @@ struct ContentView: View {
                 Text(viewModel.infoMessage ?? "")
             }
             .navigationTitle("Photo Uploader")
+            .sensoryFeedback(.success, trigger: viewModel.batchFinishedTick)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Menu("アカウント") {
