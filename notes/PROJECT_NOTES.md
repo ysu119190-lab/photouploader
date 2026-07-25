@@ -124,7 +124,15 @@
 - [x] **非パーソナライズ広告(NPA)設定の実装** — 全広告リクエストが `AdsConfig.makeRequest()`(npa=1)経由に。ATT不要・「トラッキングなし」申告が可能に。AdMob管理画面のEU同意設定のみ本番化時に要対応
 - [x] **App Store審査対応**: 審査用デモ環境 — **準備完了(2026-07-19〜20)**。デモスタック(`photouploader-review-demo` / ap-northeast-1)デプロイ済み・テストアカウント作成とログイン〜アップロード〜閲覧の動作確認済み・Review Notes の接続設定も実値反映済み(`notes/review-demo.md`)。提出時の残作業は同ファイル§6参照(ASCのApp Review情報への記入と、デモバケットへ数枚アップロードしておくことの2点のみ)
 - [x] ストア素材 — **App Store Connectへの登録完了(2026-07-23)**。名前(B案)・サブタイトル・プロモーションテキスト・概要・キーワードを転記、スクリーンショット5枚(1320×2868)を **6.9インチディスプレイ枠** にアップロード済み。文言・スクショの元は `notes/store-listing.md`(スクショはCIの「Store Screenshots」Artifact)
-- [ ] **初回審査リジェクト(2.1(a))対応→再提出** — 1.0(3)が「デモQRコード画像が必要」でリジェクト(2026-07-24)。その後、提出(Submission)を誤って削除→ステータス「削除済み」に(2026-07-25)。**ビルド作り直し不要**。対応は `notes/review-response-2.1a.md`(課題#22・§7)。あなたの作業=①バージョン1.0の「App Review情報」にQR画像 `photouploader-review-demo-qr.png` 添付+§4英文メモ(冒頭に旧Submission ID引用済み)+サインイン情報を確認 ②**新しい提出を作成しビルド3を審査に再提出**(既存ビルド流用)
+- [x] **初回審査リジェクト(2.1(a))対応→再提出→審査通過** — 1.0(3)が「デモQRコード画像が必要」でリジェクト(2026-07-24)。提出を誤削除→デモ設定JSONをエンコードしたQR画像(`notes/photouploader-review-demo-qr.png`)を添付し、旧Submission IDを引用したReview Notesで再提出。**審査通過(2026-07-25)**。経緯・文面は `notes/review-response-2.1a.md`(課題#22)
+
+### リリース操作(審査通過後・あなたの作業)
+
+- [ ] **バージョン1.0を公開(リリース)** — 審査通過後のステータスを確認する。
+  - **自動リリース**設定なら数時間で自動公開 → App Store URL 確定を待つ
+  - **手動リリース**なら「Pending Developer Release(デベロッパのリリース待ち)」表示。ASCで**「このバージョンをリリース」を押す**まで公開されない
+- [ ] **公開直後: AdMobをApp Storeリスティングに紐づけ → app-ads.txt の確認クロールを実行**(上記「AdMob本番化(残り)」の最後の項目。ストアURL確定が前提)
+- [ ] **告知の公開**(下記「告知・マーケティング」)— 確定した App Store URL を各下書きに差し込んで公開
 
 ### 審査・公開準備の追加課題(2026-07-09 洗い出し)
 
@@ -143,10 +151,12 @@
 
 ### 告知・マーケティング
 
-- [x] Zenn技術記事の下書き(`notes/zenn-article.md`)
-- [x] ランディングページ(`docs/index.html`)+ プライバシーポリシー(`docs/privacy.html`)— GitHub Pages(main / docs)で公開する
-- [x] note向け一般紹介記事の下書き(`notes/note-article.md`)— スクショ差し込みとリンク追記で公開可
-- [x] X(旧Twitter)リリース告知スレッド案 — `notes/x-thread.md`(7ポスト構成。URL差し替えで投稿可)
+いずれも下書きは完成済み。**審査通過→公開後、確定した App Store URL を差し込んで投稿するだけ。**
+
+- [ ] Zenn技術記事を公開(下書き `notes/zenn-article.md`)— URL差し込み
+- [x] ランディングページ(`docs/index.html`)+ プライバシーポリシー(`docs/privacy.html`)— GitHub Pages(main / docs)で公開済み。公開後はストアURLへのボタン/リンクを追記
+- [ ] note向け一般紹介記事を公開(下書き `notes/note-article.md`)— スクショ差し込み+URL追記
+- [ ] X(旧Twitter)リリース告知スレッドを投稿(`notes/x-thread.md`・7ポスト構成)— URL差し替え
 
 ### 機能改善(優先度順の候補)
 
