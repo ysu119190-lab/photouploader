@@ -85,6 +85,7 @@
 | 19 | TestFlight CI: 初期の実行で exportArchive が「Cloud signing permission error / No profiles for 'io.github…'」 | ASC APIキーのクラウド署名権限が原因と推定(個人アカウントでは「アクセス管理」の権限チェックボックスが表示されず、App Manager / Admin どちらのキーでも失敗)| 回避策として手動プロビジョニング版ワークフローを下書き(コミット 59b5c73・不採用)。その後の再試行ではクラウド署名のまま通り配信成功(課題#15参照。キー再発行(#17)後の権限反映が要因だった可能性)。現行mainのワークフローはクラウド署名方式 |
 | 20 | はじめてガイドの接続設定手順が不親切(UXフィードバック) | ステップ3が「出力タブに現れます」だけで、タブの場所・スマホでの見つけ方・あとから確認する方法の説明がなかった | ステップ3を番号付き手順に詳細化。「接続設定をあとから確認するには」セクション(CloudFormationコンソールリンク+ログイン画面の「現在の接続先」の案内)を追加(2026-07-19) |
 | 21 | 保存モードが初期設定されず、課金主体も不明瞭(UXフィードバック) | 保存モードの存在に気づかないまま標準モードで使い始めてしまう。料金表示がアプリ内課金と誤解されうる | 初回サインイン後に保存モード選択シートを必須表示(「この設定ではじめる」で確定・選択済みユーザーには出さない)。「アプリへの支払いではなくAWS利用料」の注意ボックスを保存モード画面とはじめてガイドの両方に追加(2026-07-19) |
+| 23 | 1.0.1のTestFlightアップロードが検証失敗「Invalid Pre-Release Train. train version '1.0' is closed」「CFBundleShortVersionString [1.0] must be higher than [1.0]」 | `MARKETING_VERSION` 設定を足しただけでは**バンドルのバージョンが1.0のまま**だった。XcodeGen生成のInfo.plistは `CFBundleShortVersionString` を既定値 "1.0" リテラルで書き、`MARKETING_VERSION` は自動反映されない(apple-generic versioningが管理するのは `CFBundleVersion`(=run_number)だけ)。よってアーカイブが 1.0 のままで、閉じた1.0トレインへの提出になり拒否 | `project.yml` の `info.properties` に `CFBundleShortVersionString: "$(MARKETING_VERSION)"` を追加し、ビルド時に `MARKETING_VERSION`(1.0.1)へ展開されるよう明示的に紐づけ。以後バージョン更新は `MARKETING_VERSION` だけ変えればよい |
 | 22 | 初回審査(1.0(3))が **2.1(a) Information Needed** でリジェクト。"We need a demo QR code or AR marker (image)" | 前回提出は Review Notes に**貼り付け用JSON**とデモログインを載せたが、セットアップ画面の先頭導線である**QRスキャン用の画像そのもの**を添えていなかった。審査員(iPad Air M3)はQRスキャンを試したが読む画像が無く、テンプレ文言で画像提出を要求 | **ビルド作り直し不要**(情報要求のため)。デモ設定JSON(`AppConfigJson`)をエンコードしたQR画像を生成(`photouploader-review-demo-qr.png`・スキャン→デコードで元JSONに戻ることを検証済み)し、Resolution Center に添付+英文返信で対応。手順・文面は `notes/review-response-2.1a.md`。デモスタックは削除していないので使い回し可 |
 
 **教訓メモ**
@@ -99,6 +100,7 @@
 - 本番広告IDをDebugビルドに入れない(`#if DEBUG`でテストIDに切り替え。無効トラフィック対策)
 - **XcodeGenのiOSプリセットは `TARGETED_DEVICE_FAMILY="1,2"` をターゲットに入れる**。iPhone専用にしたいならターゲットレベルで明示上書き(プロジェクトレベル設定は勝てない)
 - **App Store ConnectへのアップロードはiOS 26 SDK(Xcode 26)以降が必須**。macランナーのデフォルトXcodeに依存せず明示選択する
+- **マーケティングバージョンは `MARKETING_VERSION` 設定だけでは反映されない**。XcodeGen生成のInfo.plistは `CFBundleShortVersionString` を "1.0" リテラルで書くため、`info.properties` に `CFBundleShortVersionString: "$(MARKETING_VERSION)"` を明示して紐づける(課題#23)。ビルド番号(`CFBundleVersion`)は apple-generic versioning が `CURRENT_PROJECT_VERSION` から設定するので別扱い
 - **秘密鍵・証明書・パスワードはチャットに貼らない**。GitHub Secretsへ直接登録。貼ってしまったら即失効・再発行
 - Mac無しでも配布用証明書は作れる: CSR作成〜.p12化はWindowsのGit Bash(OpenSSL)で完結。ただし.p12は**レガシー形式(SHA1-3DES)**でエクスポートしないとmacOSランナーが読めない(課題#18)
 - CIの署名エラーが続くときは、手動プロビジョニング(p12+.mobileprovisionをSecretsで渡す)への切り替えが確実な逃げ道(下書きはコミット 59b5c73 に保存)
