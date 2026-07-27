@@ -162,6 +162,9 @@ func upload(fileURL: URL, contentType: String,
 - background URLSession + taskDescriptionメタデータ+再署名リトライで、**放置できるバックアップ**が作れる
 - XcodeGen + macOSランナー + xcparse + AltStoreで、**Macなしのアプリ開発ループ**が回る
 
-アプリは現在TestFlight公開に向けて準備中です。リリースしたら追記します。
+アプリはApp Storeで公開中です(日本のApp Store)。
+
+- 📱 App Store: https://apps.apple.com/jp/app/id6791448022
+- 💻 ソースコード: https://github.com/ysu119190-lab/photouploader
 
 (質問・ツッコミ歓迎です)

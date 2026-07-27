@@ -14,7 +14,7 @@ iPhoneの写真を "自分のAWS" にバックアップするアプリ **PhotoUp
 
 サブスクなし。かかるのはAWSの実費だけ(写真100GBで月75円〜)。
 
-［App StoreのURL］
+https://apps.apple.com/jp/app/id6791448022
 
 **2/7(コンセプト: データは自分のもの)**
 

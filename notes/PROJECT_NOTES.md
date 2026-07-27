@@ -153,6 +153,7 @@
 - [ ] **TestFlightワークフローを手動実行しビルドをアップロード**(あなた)— Actions → TestFlight → Run workflow(mainから)
 - [ ] **ASCで1.0.1バージョンを作成し提出**(あなた)— `(+) バージョンまたはプラットフォーム` → 1.0.1 → **マーケティングURLに `https://ysu119190-lab.github.io/photouploader/`** → アップしたビルドを選択 → 「今回のアップデート内容」記入 → 審査に提出。※URLだけの変更は「ユーザー向け変更なし」と見られうるので小改善の同梱が無難
 - [ ] **公開後: AdMobでapp-ads.txt再クロール → 確認済みを確認**(あなた)
+  - **課題(2026-07-27): AdMobのストア連携検索でアプリが出ない → 原因はストアフロント不一致。** AdMobの「アプリストアにリンク」検索はAppleの iTunes Search API を**既定でUSストアフロント**に対して叩く。本アプリは**日本限定配信**のためUSには存在せず、App Store ID(`6791448022`)で検索しても0件だった。切り分け方法: ブラウザで `https://itunes.apple.com/lookup?id=6791448022`(US=0件)と `https://itunes.apple.com/jp/lookup?id=6791448022`(JP=1件)を比較→JPのみヒットで確定。**対応: App Store Connectで配信地域に一時的にアメリカを追加**(再審査不要・反映に数時間〜24h)→AdMobで検索ヒット後リンク→リンクはApp Store IDで紐づくのでUSを外して日本のみに戻してもリンク維持。**2026-07-27にUS追加済み・反映待ち。** ブロッカーではない(フェイルオープン=未リンクでも広告は配信)
 - [ ] **告知の公開**(下記「告知・マーケティング」)— 確定した App Store URL を各下書きに差し込んで公開
 
 ### 審査・公開準備の追加課題(2026-07-09 洗い出し)
@@ -174,10 +175,10 @@
 
 いずれも下書きは完成済み。**審査通過→公開後、確定した App Store URL を差し込んで投稿するだけ。**
 
-- [ ] Zenn技術記事を公開(下書き `notes/zenn-article.md`)— URL差し込み
+- [ ] Zenn技術記事を公開(下書き `notes/zenn-article.md`)— **App Store URL差し込み済み(2026-07-27)**。あとはZennにコピペ→frontmatterを `published: true` にして公開するだけ
 - [x] ランディングページ(`docs/index.html`)+ プライバシーポリシー(`docs/privacy.html`)— GitHub Pages(main / docs)で公開済み。公開後はストアURLへのボタン/リンクを追記
-- [ ] note向け一般紹介記事を公開(下書き `notes/note-article.md`)— スクショ差し込み+URL追記
-- [ ] X(旧Twitter)リリース告知スレッドを投稿(`notes/x-thread.md`・7ポスト構成)— URL差し替え
+- [ ] note向け一般紹介記事を公開(下書き `notes/note-article.md`)— **App Store URL差し込み済み(2026-07-27)**。残り: `[画像]` にCIの Store Screenshots Artifact を差し込み→noteに投稿
+- [ ] X(旧Twitter)リリース告知スレッドを投稿(`notes/x-thread.md`・7ポスト構成)— **App Store URL差し込み済み(2026-07-27)**。残り: 7/7ポストのZenn/note記事URL(`［ ］`)は各記事の公開後に差し替え→投稿(推奨順: Zenn/note公開→URL取得→X投稿)
 
 ### 機能改善(優先度順の候補)
 
