@@ -8,6 +8,11 @@ import GoogleMobileAds
 /// during development counts as invalid traffic and can get the AdMob
 /// account suspended. The production app ID lives in project.yml
 /// (GADApplicationIdentifier); test unit IDs work fine under it.
+///
+/// If a Release build shows no ads at all, check AdMob before suspecting this
+/// file: a newly published app stays "review required" (serving limited) until
+/// it is linked to its store listing in the AdMob console, and app-ads.txt
+/// cannot be verified before that link exists either. See PROJECT_NOTES #23.
 enum AdsConfig {
     #if DEBUG
     static let bannerAdUnitID = "ca-app-pub-3940256099942544/2934735716"
