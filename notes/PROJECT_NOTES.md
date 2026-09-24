@@ -89,6 +89,7 @@
 | 23 | 1.0.1のTestFlightアップロードが検証失敗「Invalid Pre-Release Train. train version '1.0' is closed」「CFBundleShortVersionString [1.0] must be higher than [1.0]」 | `MARKETING_VERSION` 設定を足しただけでは**バンドルのバージョンが1.0のまま**だった。XcodeGen生成のInfo.plistは `CFBundleShortVersionString` を既定値 "1.0" リテラルで書き、`MARKETING_VERSION` は自動反映されない(apple-generic versioningが管理するのは `CFBundleVersion`(=run_number)だけ)。よってアーカイブが 1.0 のままで、閉じた1.0トレインへの提出になり拒否 | `project.yml` の `info.properties` に `CFBundleShortVersionString: "$(MARKETING_VERSION)"` を追加し、ビルド時に `MARKETING_VERSION`(1.0.1)へ展開されるよう明示的に紐づけ。以後バージョン更新は `MARKETING_VERSION` だけ変えればよい |
 | 22 | 初回審査(1.0(3))が **2.1(a) Information Needed** でリジェクト。"We need a demo QR code or AR marker (image)" | 前回提出は Review Notes に**貼り付け用JSON**とデモログインを載せたが、セットアップ画面の先頭導線である**QRスキャン用の画像そのもの**を添えていなかった。審査員(iPad Air M3)はQRスキャンを試したが読む画像が無く、テンプレ文言で画像提出を要求 | **ビルド作り直し不要**(情報要求のため)。デモ設定JSON(`AppConfigJson`)をエンコードしたQR画像を生成(`photouploader-review-demo-qr.png`・スキャン→デコードで元JSONに戻ることを検証済み)し、Resolution Center に添付+英文返信で対応。手順・文面は `notes/review-response-2.1a.md`。デモスタックは削除していないので使い回し可 |
 | 24 | 動画のアップロードだけ「アップロードURLの取得に失敗しました (HTTP 400)」(写真は成功)(2026-09-24 ユーザー報告) | アプリ内のクイック作成リンクが読むS3上の公開テンプレート(`photouploader-templatebuilder/photo-uploader/template.yaml`)が**動画対応前(7月上旬)の版のまま**だった。`publish-template` を7/10の動画対応以降一度も再実行しておらず、そこから作ったスタックのLambdaは画像形式しか受け付けない(動画のcontentTypeを400で拒否)。同じ理由でサムネイル・ゴミ箱削除も未反映。リポジトリ内のテンプレートは最新でCIも緑だったため気づけなかった | `publish-template` を再実行(またはS3コンソールで `template.yaml` を上書き)して公開テンプレートを更新し、既存スタックを「スタックの更新」で反映(ユーザー作業) |
+| 25 | TestFlight(1.0.2・run #14)がアーカイブで失敗「Your account has reached the maximum number of certificates」「No profiles for 'io.github…' were found」 | ワークフローは自動署名(`CODE_SIGN_STYLE=Automatic` + `-allowProvisioningUpdates`)で、アーカイブ時に**毎回まっさらなランナー上で Apple Development 証明書を新規作成**していた。13回の実行で作られた証明書が溜まり上限に到達 | ユーザーが Developer Portal で「Apple Development」証明書を取り消し(Apple Distribution は `DIST_CERT_P12` で使用中のため残す)→再実行。**根本対策は未実施**: 数回ごとに再発するため、開発証明書を作らない署名方式(手動プロビジョニング版=コミット 59b5c73 など)への切り替えを別途検討 |
 
 **教訓メモ**
 
@@ -104,6 +105,7 @@
 - **App Store ConnectへのアップロードはiOS 26 SDK(Xcode 26)以降が必須**。macランナーのデフォルトXcodeに依存せず明示選択する
 - **マーケティングバージョンは `MARKETING_VERSION` 設定だけでは反映されない**。XcodeGen生成のInfo.plistは `CFBundleShortVersionString` を "1.0" リテラルで書くため、`info.properties` に `CFBundleShortVersionString: "$(MARKETING_VERSION)"` を明示して紐づける(課題#23)。ビルド番号(`CFBundleVersion`)は apple-generic versioning が `CURRENT_PROJECT_VERSION` から設定するので別扱い
 - **バックエンド(テンプレート)を変えたら、マージ後に必ず `publish-template` を再実行する**。リポジトリとCIが緑でも、利用者がクイック作成リンクで作るスタックはS3上の公開テンプレートで決まる(課題#24)。公開版の確認は `curl <テンプレートURL>` で中身を見るのが早い
+- **TestFlight CIの自動署名は実行ごとに Apple Development 証明書を増やす**。上限エラーが出たら Developer Portal で Apple Development を取り消す(Apple Distribution は消さない)(課題#25)
 - **秘密鍵・証明書・パスワードはチャットに貼らない**。GitHub Secretsへ直接登録。貼ってしまったら即失効・再発行
 - Mac無しでも配布用証明書は作れる: CSR作成〜.p12化はWindowsのGit Bash(OpenSSL)で完結。ただし.p12は**レガシー形式(SHA1-3DES)**でエクスポートしないとmacOSランナーが読めない(課題#18)
 - CIの署名エラーが続くときは、手動プロビジョニング(p12+.mobileprovisionをSecretsで渡す)への切り替えが確実な逃げ道(下書きはコミット 59b5c73 に保存)
@@ -198,8 +200,9 @@
 撮影月の算出はアプリ側の処理のため、App Store利用者に届けるには **1.0.2** として配信が必要(1.0.1は配信済み)。バックエンドだけ更新して旧アプリのままだと、アップロード月の `YYYY/MM` に保存される(動作に支障なし)。
 
 - [x] **マーケティングバージョンを1.0.2に**(2026-09-24)— `ios/project.yml` の `MARKETING_VERSION: "1.0.2"`
-- [ ] **1.0.2をmainへマージ**(PR経由・CI緑確認後)
-- [ ] **TestFlightワークフローを手動実行**(あなた)— Actions → TestFlight → Run workflow(mainから)
+- [x] **1.0.2をmainへマージ**(2026-09-24)— PR #23、CI 3ジョブ緑を確認後マージ
+- [ ] **TestFlightワークフローを手動実行** — run #14 は証明書上限で失敗(課題#25)→証明書取り消し後に再実行中(2026-09-24)
+- [ ] **TestFlight署名方式の根本対策**(課題#25)— 開発証明書を毎回作らない方式へ。1.0.2配信後に着手
 - [ ] **ASCで1.0.2を作成し提出**(あなた)— アップしたビルドを選択 → 「今回のアップデート内容」記入 → 審査に提出
   - **今回のアップデート内容(What's New)案**:
     ```
