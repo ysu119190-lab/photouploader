@@ -196,8 +196,10 @@
 ### 撮影月フォルダ分け(2026-09-24)
 
 - [x] **アップロード先を撮影月ごとのフォルダに**(2026-09-24)— バックエンド: presignが `captureMonth` を受け取りキーを `uploads/<sub>/[albums/<アルバム>/]YYYY/MM/UUID` に(日フォルダは廃止)。1900年〜翌年・1〜12月以外や書式不正はアップロード月にフォールバック。pytest 3件追加(計18件)。iOS: 全アップロード経路で撮影月を算出して送信(403再署名リトライ時もメタデータで引き継ぎ)。ユニットテスト2件追加
-- [ ] **公開テンプレートの更新**(あなた)— PR #22 マージ後、`publish-template.ps1 -BucketName photouploader-templatebuilder` を再実行(またはGitHub Pagesの `template-quickcreate.yaml` を `template.yaml` にリネームしてS3コンソールの `photo-uploader/` に上書きアップロード)。**動画の400エラー(課題#24)もこれで解消**。確認: 公開URLの中身に `video/mp4` と `captureMonth` があること
-- [ ] **既存スタックの再デプロイ**(あなた)— バックエンドを更新しないと旧Lambdaが `captureMonth` を無視し、従来どおりアップロード日 `YYYY/MM/DD` に保存される(アプリは新旧どちらのバックエンドでも動作する)。クイック作成スタックは「スタックの更新」で同じテンプレートURLを指定(テンプレートは `publish-template` 再実行で反映)
+- [x] **公開テンプレートの更新** — 完了(2026-09-24)。公開URLの中身が main の `template-quickcreate.yaml` と完全一致することを確認(video/mp4・captureMonth入り)。手順メモ: PR #22 マージ後、`publish-template.ps1 -BucketName photouploader-templatebuilder` を再実行(またはGitHub Pagesの `template-quickcreate.yaml` を `template.yaml` にリネームしてS3コンソールの `photo-uploader/` に上書きアップロード)。**動画の400エラー(課題#24)もこれで解消**。確認: 公開URLの中身に `video/mp4` と `captureMonth` があること
+- [x] **既存スタックの再デプロイ** — 完了(2026-09-24・ユーザー実施)。 バックエンドを更新しないと旧Lambdaが `captureMonth` を無視し、従来どおりアップロード日 `YYYY/MM/DD` に保存される(アプリは新旧どちらのバックエンドでも動作する)。クイック作成スタックは「スタックの更新」で同じテンプレートURLを指定(テンプレートは `publish-template` 再実行で反映)
+- [x] **PR #22 を main へマージ**(2026-09-24)— CI 3ジョブ緑を確認後マージ
+- [ ] **実機で動作確認**(あなた)— 動画が400にならずアップできること、S3で `uploads/<sub>/YYYY/MM/` に撮影月で入ること
 - 補足: 既存のオブジェクトは移動しない(ギャラリー表示・削除は新旧キー混在でも動作)。ギャラリーの並びは従来どおりアップロード時刻順
 
 ### 運用メモ
