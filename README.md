@@ -186,7 +186,7 @@ cd backend
 aws s3 ls s3://<BucketName>/uploads/ --recursive
 ```
 
-オブジェクトキーは `uploads/<ユーザーID>/YYYY/MM/DD/<UUID>.<拡張子>` の形式で、ユーザーごとに領域が分かれます。
+オブジェクトキーは `uploads/<ユーザーID>/YYYY/MM/<UUID>.<拡張子>` の形式で、ユーザーごとに領域が分かれます。`YYYY/MM` は**撮影月**(端末のタイムゾーン基準)で、写真・動画は撮影月ごとのフォルダに振り分けられます(撮影日時が取れない場合はアップロード月)。アルバム付きのバックアップは `uploads/<ユーザーID>/albums/<アルバム名>/YYYY/MM/<UUID>.<拡張子>` です。
 
 API を直接試したい場合(トークンの取得には AWS CLI が使えます):
 

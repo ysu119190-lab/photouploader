@@ -1,4 +1,5 @@
 import AVFoundation
+import ImageIO
 import Photos
 import PhotosUI
 import SwiftUI
@@ -248,6 +249,7 @@ final class UploadViewModel: ObservableObject {
             rawData: data,
             rawContentType: "image/jpeg",
             album: nil,
+            captureMonth: Self.captureMonth(of: Date()),
             itemID: itemID,
             dedupID: nil
         )
@@ -274,10 +276,15 @@ final class UploadViewModel: ObservableObject {
                 let contentType = pickerItem.supportedContentTypes
                     .first { $0.conforms(to: .movie) }?
                     .preferredMIMEType ?? "video/quicktime"
+                var captureDate = Self.libraryCreationDate(of: pickerItem.itemIdentifier)
+                if captureDate == nil {
+                    captureDate = await Self.videoCreationDate(of: movie.url)
+                }
                 await uploadVideoFile(
                     fileURL: movie.url,
                     contentType: contentType,
                     album: nil,
+                    captureMonth: Self.captureMonth(of: captureDate),
                     itemID: itemID,
                     dedupID: pickerItem.itemIdentifier
                 )
@@ -289,10 +296,13 @@ final class UploadViewModel: ObservableObject {
                 let rawContentType = pickerItem.supportedContentTypes
                     .compactMap(\.preferredMIMEType)
                     .first ?? "image/jpeg"
+                let captureDate = Self.libraryCreationDate(of: pickerItem.itemIdentifier)
+                    ?? Self.exifCaptureDate(of: rawData)
                 await uploadImage(
                     rawData: rawData,
                     rawContentType: rawContentType,
                     album: nil,
+                    captureMonth: Self.captureMonth(of: captureDate),
                     itemID: itemID,
                     dedupID: pickerItem.itemIdentifier
                 )
@@ -311,12 +321,14 @@ final class UploadViewModel: ObservableObject {
     private func upload(_ asset: PHAsset, itemID: UUID) async {
         do {
             let album = Self.albumName(for: asset)
+            let captureMonth = Self.captureMonth(of: asset.creationDate)
             if asset.mediaType == .video {
                 let (fileURL, contentType) = try await Self.exportVideo(asset)
                 await uploadVideoFile(
                     fileURL: fileURL,
                     contentType: contentType,
                     album: album,
+                    captureMonth: captureMonth,
                     itemID: itemID,
                     dedupID: asset.localIdentifier
                 )
@@ -326,6 +338,7 @@ final class UploadViewModel: ObservableObject {
                     rawData: rawData,
                     rawContentType: rawContentType,
                     album: album,
+                    captureMonth: captureMonth,
                     itemID: itemID,
                     dedupID: asset.localIdentifier
                 )
@@ -342,6 +355,7 @@ final class UploadViewModel: ObservableObject {
         rawData: Data,
         rawContentType: String,
         album: String?,
+        captureMonth: String?,
         itemID: UUID,
         dedupID: String?
     ) async {
@@ -363,6 +377,7 @@ final class UploadViewModel: ObservableObject {
                 fileURL: fileURL,
                 contentType: contentType,
                 album: album,
+                captureMonth: captureMonth,
                 itemID: itemID,
                 thumbnailData: await Self.makeThumbnailData(fromImageData: rawData)
             )
@@ -380,6 +395,7 @@ final class UploadViewModel: ObservableObject {
         fileURL: URL,
         contentType: String,
         album: String?,
+        captureMonth: String?,
         itemID: UUID,
         dedupID: String?
     ) async {
@@ -397,6 +413,7 @@ final class UploadViewModel: ObservableObject {
                 fileURL: fileURL,
                 contentType: contentType,
                 album: album,
+                captureMonth: captureMonth,
                 itemID: itemID,
                 thumbnailData: thumbnail?.jpegData(compressionQuality: 0.7)
             )
@@ -415,6 +432,7 @@ final class UploadViewModel: ObservableObject {
         fileURL: URL,
         contentType: String,
         album: String?,
+        captureMonth: String?,
         itemID: UUID,
         thumbnailData: Data?
     ) async throws {
@@ -424,6 +442,7 @@ final class UploadViewModel: ObservableObject {
             contentType: contentType,
             storageClass: StorageModeStore.current.rawValue,
             album: album,
+            captureMonth: captureMonth,
             wantsThumbnail: thumbnailData != nil
         ) { progress in
             Task { @MainActor [weak self] in
@@ -479,6 +498,50 @@ final class UploadViewModel: ObservableObject {
         // in the background queue — re-sign once and retry.
         guard let fresh = try? await PresignClient.requestThumbnailURL(for: key) else { return }
         _ = await put(fresh.thumbnailUploadUrl)
+    }
+
+    /// "YYYY-MM" of the capture date in the device's time zone — the S3
+    /// folder the photo is filed under. nil lets the backend fall back to
+    /// the upload month.
+    nonisolated static func captureMonth(of date: Date?) -> String? {
+        guard let date else { return nil }
+        let parts = Calendar.current.dateComponents([.year, .month], from: date)
+        guard let year = parts.year, let month = parts.month else { return nil }
+        return String(format: "%04d-%02d", year, month)
+    }
+
+    /// Creation date of a library asset picked through PhotosPicker. Needs
+    /// photo library access; without it the fetch is empty and we fall back
+    /// to the file's own metadata.
+    nonisolated private static func libraryCreationDate(of assetID: String?) -> Date? {
+        guard let assetID else { return nil }
+        return PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil)
+            .firstObject?.creationDate
+    }
+
+    /// EXIF DateTimeOriginal ("yyyy:MM:dd HH:mm:ss", camera local time).
+    nonisolated static func exifCaptureDate(of data: Data) -> Date? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil)
+                as? [CFString: Any],
+              let exif = properties[kCGImagePropertyExifDictionary] as? [CFString: Any],
+              let raw = exif[kCGImagePropertyExifDateTimeOriginal] as? String
+        else {
+            return nil
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
+        return formatter.date(from: raw)
+    }
+
+    /// Recording date embedded in a video file's metadata.
+    nonisolated private static func videoCreationDate(of url: URL) async -> Date? {
+        guard let item = try? await AVURLAsset(url: url).load(.creationDate) else {
+            return nil
+        }
+        return try? await item.load(.dateValue)
     }
 
     /// The name of the first user album containing the asset, if any.

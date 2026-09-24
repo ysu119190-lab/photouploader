@@ -43,6 +43,7 @@ enum PresignClient {
         contentType: String,
         storageClass: String,
         album: String? = nil,
+        captureMonth: String? = nil,
         wantsThumbnail: Bool = false
     ) async throws -> PresignResponse {
         var body: [String: Any] = [
@@ -52,6 +53,11 @@ enum PresignClient {
         if let album, !album.isEmpty {
             // The backend mirrors the album as a folder in the object key.
             body["album"] = album
+        }
+        if let captureMonth {
+            // "YYYY-MM": the backend files the object under that month's
+            // folder. Without it, the upload month is used.
+            body["captureMonth"] = captureMonth
         }
         if wantsThumbnail {
             // One request returns both PUT URLs — no extra API call for thumbs.
