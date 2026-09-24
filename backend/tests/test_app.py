@@ -114,6 +114,38 @@ def test_presign_embeds_sanitized_album_in_key():
     assert body["key"].endswith(".mp4")
 
 
+def test_presign_groups_key_by_capture_month():
+    status, body = call(
+        "POST /presign", {"contentType": "image/heic", "captureMonth": "2019-03"}
+    )
+    assert status == 200
+    assert body["key"].startswith(f"uploads/{USER}/2019/03/")
+    assert body["key"].count("/") == 4  # uploads/<sub>/YYYY/MM/<uuid>.heic
+
+    status, body = call(
+        "POST /presign",
+        {"contentType": "image/jpeg", "album": "旅行", "captureMonth": "2024-12"},
+    )
+    assert status == 200
+    assert body["key"].startswith(f"uploads/{USER}/albums/旅行/2024/12/")
+
+
+def test_capture_month_falls_back_to_upload_month():
+    now = datetime.datetime(2026, 9, 24, tzinfo=datetime.timezone.utc)
+    assert app._capture_month_folder("2020-01", now) == "2020/01"
+    assert app._capture_month_folder("2027-12", now) == "2027/12"
+    for bad in (None, "", 202001, "2020-13", "2020-00", "1899-05",
+                "2028-01", "2020-1", "2020/01", "2020-01-05", "../x"):
+        assert app._capture_month_folder(bad, now) == "2026/09"
+
+
+def test_presign_without_capture_month_uses_upload_month():
+    status, body = call("POST /presign", {"contentType": "image/jpeg"})
+    assert status == 200
+    now = datetime.datetime.now(datetime.timezone.utc)
+    assert body["key"].startswith(f"uploads/{USER}/{now:%Y/%m}/")
+
+
 def test_presign_with_thumbnail_returns_matching_thumb_urls():
     status, body = call(
         "POST /presign", {"contentType": "image/png", "thumbnail": True}

@@ -41,6 +41,7 @@ final class BackgroundUploadManager: NSObject {
         // Optionals so task descriptions written by older app versions still
         // decode after an update mid-transfer.
         let album: String?
+        let captureMonth: String?
         let wantsThumbnail: Bool?
         let thumbnailUploadUrl: String?
         let key: String
@@ -62,6 +63,7 @@ final class BackgroundUploadManager: NSObject {
         contentType: String,
         storageClass: String,
         album: String? = nil,
+        captureMonth: String? = nil,
         wantsThumbnail: Bool = false,
         onProgress: @escaping @Sendable (Double) -> Void
     ) async throws -> BackgroundUploadResult {
@@ -80,6 +82,7 @@ final class BackgroundUploadManager: NSObject {
                         contentType: contentType,
                         storageClass: storageClass,
                         album: album,
+                        captureMonth: captureMonth,
                         wantsThumbnail: wantsThumbnail,
                         attempt: 1
                     )
@@ -98,6 +101,7 @@ final class BackgroundUploadManager: NSObject {
         contentType: String,
         storageClass: String,
         album: String?,
+        captureMonth: String?,
         wantsThumbnail: Bool,
         attempt: Int
     ) async throws {
@@ -105,6 +109,7 @@ final class BackgroundUploadManager: NSObject {
             contentType: contentType,
             storageClass: storageClass,
             album: album,
+            captureMonth: captureMonth,
             wantsThumbnail: wantsThumbnail
         )
         guard let uploadURL = URL(string: presign.uploadUrl) else {
@@ -127,6 +132,7 @@ final class BackgroundUploadManager: NSObject {
             contentType: contentType,
             storageClass: storageClass,
             album: album,
+            captureMonth: captureMonth,
             wantsThumbnail: wantsThumbnail,
             thumbnailUploadUrl: presign.thumbnailUploadUrl,
             key: presign.key,
@@ -236,6 +242,7 @@ extension BackgroundUploadManager: URLSessionTaskDelegate {
                         contentType: metadata.contentType,
                         storageClass: metadata.storageClass,
                         album: metadata.album,
+                        captureMonth: metadata.captureMonth,
                         wantsThumbnail: metadata.wantsThumbnail ?? false,
                         attempt: metadata.attempt + 1
                     )

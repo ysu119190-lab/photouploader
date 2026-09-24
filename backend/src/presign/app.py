@@ -14,6 +14,7 @@ under their own uploads/<user id>/ prefix.
 import datetime
 import json
 import os
+import re
 import uuid
 
 import boto3
@@ -48,6 +49,12 @@ ALLOWED_STORAGE_CLASSES = {"STANDARD", "GLACIER_IR"}
 
 MAX_ALBUM_LENGTH = 64
 
+# "YYYY-MM" capture month sent by the app (computed in the device's local
+# time zone, so a photo taken just after midnight on the 1st lands in the
+# month the user saw on their clock).
+CAPTURE_MONTH_PATTERN = re.compile(r"(\d{4})-(\d{2})", re.ASCII)
+MIN_CAPTURE_YEAR = 1900
+
 UPLOAD_PREFIX = "uploads/"
 THUMB_PREFIX = "thumbs/"
 TRASH_PREFIX = "trash/"
@@ -71,6 +78,19 @@ def _sanitize_album(raw):
     cleaned = "".join(c for c in raw if c.isprintable() and c not in "/\\")
     cleaned = " ".join(cleaned.split())[:MAX_ALBUM_LENGTH].strip()
     return cleaned or None
+
+
+def _capture_month_folder(raw, now):
+    """The "YYYY/MM" folder for an upload: the photo's capture month when the
+    app sent a valid one, otherwise the upload month (UTC)."""
+    if isinstance(raw, str):
+        match = CAPTURE_MONTH_PATTERN.fullmatch(raw)
+        if match:
+            year, month = int(match.group(1)), int(match.group(2))
+            # A year past next year means a broken camera clock or bad EXIF.
+            if MIN_CAPTURE_YEAR <= year <= now.year + 1 and 1 <= month <= 12:
+                return f"{year:04d}/{month:02d}"
+    return f"{now:%Y/%m}"
 
 
 def handler(event, _context):
@@ -138,13 +158,16 @@ def _presign(user_id, event):
         )
 
     now = datetime.datetime.now(datetime.timezone.utc)
+    # Uploads are grouped into one folder per capture month (YYYY/MM), so
+    # browsing the bucket directly reads like a photo timeline.
+    month = _capture_month_folder(body.get("captureMonth"), now)
     # Album uploads mirror the phone's album structure under albums/<name>/,
     # so the folder layout is meaningful when browsing the bucket directly.
     album = _sanitize_album(body.get("album"))
     if album:
-        key = f"uploads/{user_id}/albums/{album}/{now:%Y/%m/%d}/{uuid.uuid4()}{extension}"
+        key = f"uploads/{user_id}/albums/{album}/{month}/{uuid.uuid4()}{extension}"
     else:
-        key = f"uploads/{user_id}/{now:%Y/%m/%d}/{uuid.uuid4()}{extension}"
+        key = f"uploads/{user_id}/{month}/{uuid.uuid4()}{extension}"
 
     params = {"Bucket": BUCKET_NAME, "Key": key, "ContentType": content_type}
     # STANDARD is S3's default; only sign a StorageClass when it differs, so

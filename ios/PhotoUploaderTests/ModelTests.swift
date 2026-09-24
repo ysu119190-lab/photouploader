@@ -1,3 +1,6 @@
+import ImageIO
+import UIKit
+import UniformTypeIdentifiers
 import XCTest
 @testable import PhotoUploader
 
@@ -92,5 +95,40 @@ final class ModelTests: XCTestCase {
 
         UploadItemsSnapshotStore.clear()
         XCTAssertTrue(UploadItemsSnapshotStore.load().isEmpty)
+    }
+
+    // MARK: Capture month (S3 folder)
+
+    func testCaptureMonthFormatsInLocalCalendar() {
+        var components = DateComponents()
+        components.year = 2019
+        components.month = 3
+        components.day = 31
+        components.hour = 23
+        let date = Calendar.current.date(from: components)!
+        XCTAssertEqual(UploadViewModel.captureMonth(of: date), "2019-03")
+        XCTAssertNil(UploadViewModel.captureMonth(of: nil))
+    }
+
+    func testExifCaptureDateReadsDateTimeOriginal() throws {
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 4, height: 4)).image { context in
+            UIColor.red.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 4, height: 4))
+        }
+        let data = NSMutableData()
+        let destination = try XCTUnwrap(
+            CGImageDestinationCreateWithData(data, UTType.jpeg.identifier as CFString, 1, nil)
+        )
+        let properties: [CFString: Any] = [
+            kCGImagePropertyExifDictionary: [
+                kCGImagePropertyExifDateTimeOriginal: "2021:11:05 08:30:00",
+            ],
+        ]
+        CGImageDestinationAddImage(destination, try XCTUnwrap(image.cgImage), properties as CFDictionary)
+        XCTAssertTrue(CGImageDestinationFinalize(destination))
+
+        let date = UploadViewModel.exifCaptureDate(of: data as Data)
+        XCTAssertEqual(UploadViewModel.captureMonth(of: date), "2021-11")
+        XCTAssertNil(UploadViewModel.exifCaptureDate(of: Data([0x00, 0x01])))
     }
 }
