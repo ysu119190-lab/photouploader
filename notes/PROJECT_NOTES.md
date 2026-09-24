@@ -89,7 +89,7 @@
 | 23 | 1.0.1のTestFlightアップロードが検証失敗「Invalid Pre-Release Train. train version '1.0' is closed」「CFBundleShortVersionString [1.0] must be higher than [1.0]」 | `MARKETING_VERSION` 設定を足しただけでは**バンドルのバージョンが1.0のまま**だった。XcodeGen生成のInfo.plistは `CFBundleShortVersionString` を既定値 "1.0" リテラルで書き、`MARKETING_VERSION` は自動反映されない(apple-generic versioningが管理するのは `CFBundleVersion`(=run_number)だけ)。よってアーカイブが 1.0 のままで、閉じた1.0トレインへの提出になり拒否 | `project.yml` の `info.properties` に `CFBundleShortVersionString: "$(MARKETING_VERSION)"` を追加し、ビルド時に `MARKETING_VERSION`(1.0.1)へ展開されるよう明示的に紐づけ。以後バージョン更新は `MARKETING_VERSION` だけ変えればよい |
 | 22 | 初回審査(1.0(3))が **2.1(a) Information Needed** でリジェクト。"We need a demo QR code or AR marker (image)" | 前回提出は Review Notes に**貼り付け用JSON**とデモログインを載せたが、セットアップ画面の先頭導線である**QRスキャン用の画像そのもの**を添えていなかった。審査員(iPad Air M3)はQRスキャンを試したが読む画像が無く、テンプレ文言で画像提出を要求 | **ビルド作り直し不要**(情報要求のため)。デモ設定JSON(`AppConfigJson`)をエンコードしたQR画像を生成(`photouploader-review-demo-qr.png`・スキャン→デコードで元JSONに戻ることを検証済み)し、Resolution Center に添付+英文返信で対応。手順・文面は `notes/review-response-2.1a.md`。デモスタックは削除していないので使い回し可 |
 | 24 | 動画のアップロードだけ「アップロードURLの取得に失敗しました (HTTP 400)」(写真は成功)(2026-09-24 ユーザー報告) | アプリ内のクイック作成リンクが読むS3上の公開テンプレート(`photouploader-templatebuilder/photo-uploader/template.yaml`)が**動画対応前(7月上旬)の版のまま**だった。`publish-template` を7/10の動画対応以降一度も再実行しておらず、そこから作ったスタックのLambdaは画像形式しか受け付けない(動画のcontentTypeを400で拒否)。同じ理由でサムネイル・ゴミ箱削除も未反映。リポジトリ内のテンプレートは最新でCIも緑だったため気づけなかった | `publish-template` を再実行(またはS3コンソールで `template.yaml` を上書き)して公開テンプレートを更新し、既存スタックを「スタックの更新」で反映(ユーザー作業) |
-| 25 | TestFlight(1.0.2・run #14)がアーカイブで失敗「Your account has reached the maximum number of certificates」「No profiles for 'io.github…' were found」 | ワークフローは自動署名(`CODE_SIGN_STYLE=Automatic` + `-allowProvisioningUpdates`)で、アーカイブ時に**毎回まっさらなランナー上で Apple Development 証明書を新規作成**していた。13回の実行で作られた証明書が溜まり上限に到達 | ユーザーが Developer Portal で「Apple Development」証明書を取り消し(Apple Distribution は `DIST_CERT_P12` で使用中のため残す)→再実行。**根本対策は未実施**: 数回ごとに再発するため、開発証明書を作らない署名方式(手動プロビジョニング版=コミット 59b5c73 など)への切り替えを別途検討 |
+| 25 | TestFlight(1.0.2・run #14)がアーカイブで失敗「Your account has reached the maximum number of certificates」「No profiles for 'io.github…' were found」 | ワークフローは自動署名(`CODE_SIGN_STYLE=Automatic` + `-allowProvisioningUpdates`)で、アーカイブ時に**毎回まっさらなランナー上で Apple Development 証明書を新規作成**していた。13回の実行で作られた証明書が溜まり上限に到達 | ユーザーが Developer Portal で「Apple Development」証明書を取り消し(Apple Distribution は `DIST_CERT_P12` で使用中のため残す)→再実行(run #15)で成功。**根本対策は未実施**: 数回ごとに再発するため、開発証明書を作らない署名方式(手動プロビジョニング版=コミット 59b5c73 など)への切り替えを別途検討 |
 
 **教訓メモ**
 
@@ -201,7 +201,7 @@
 
 - [x] **マーケティングバージョンを1.0.2に**(2026-09-24)— `ios/project.yml` の `MARKETING_VERSION: "1.0.2"`
 - [x] **1.0.2をmainへマージ**(2026-09-24)— PR #23、CI 3ジョブ緑を確認後マージ
-- [ ] **TestFlightワークフローを手動実行** — run #14 は証明書上限で失敗(課題#25)→証明書取り消し後に再実行中(2026-09-24)
+- [x] **TestFlightワークフローを手動実行** — 完了(2026-09-24)。run #14 は証明書上限で失敗(課題#25)→証明書取り消し後の run #15 で成功(ビルド番号15・1.0.2)
 - [ ] **TestFlight署名方式の根本対策**(課題#25)— 開発証明書を毎回作らない方式へ。1.0.2配信後に着手
 - [ ] **ASCで1.0.2を作成し提出**(あなた)— アップしたビルドを選択 → 「今回のアップデート内容」記入 → 審査に提出
   - **今回のアップデート内容(What's New)案**:
