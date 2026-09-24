@@ -88,6 +88,7 @@
 | 21 | 保存モードが初期設定されず、課金主体も不明瞭(UXフィードバック) | 保存モードの存在に気づかないまま標準モードで使い始めてしまう。料金表示がアプリ内課金と誤解されうる | 初回サインイン後に保存モード選択シートを必須表示(「この設定ではじめる」で確定・選択済みユーザーには出さない)。「アプリへの支払いではなくAWS利用料」の注意ボックスを保存モード画面とはじめてガイドの両方に追加(2026-07-19) |
 | 23 | 1.0.1のTestFlightアップロードが検証失敗「Invalid Pre-Release Train. train version '1.0' is closed」「CFBundleShortVersionString [1.0] must be higher than [1.0]」 | `MARKETING_VERSION` 設定を足しただけでは**バンドルのバージョンが1.0のまま**だった。XcodeGen生成のInfo.plistは `CFBundleShortVersionString` を既定値 "1.0" リテラルで書き、`MARKETING_VERSION` は自動反映されない(apple-generic versioningが管理するのは `CFBundleVersion`(=run_number)だけ)。よってアーカイブが 1.0 のままで、閉じた1.0トレインへの提出になり拒否 | `project.yml` の `info.properties` に `CFBundleShortVersionString: "$(MARKETING_VERSION)"` を追加し、ビルド時に `MARKETING_VERSION`(1.0.1)へ展開されるよう明示的に紐づけ。以後バージョン更新は `MARKETING_VERSION` だけ変えればよい |
 | 22 | 初回審査(1.0(3))が **2.1(a) Information Needed** でリジェクト。"We need a demo QR code or AR marker (image)" | 前回提出は Review Notes に**貼り付け用JSON**とデモログインを載せたが、セットアップ画面の先頭導線である**QRスキャン用の画像そのもの**を添えていなかった。審査員(iPad Air M3)はQRスキャンを試したが読む画像が無く、テンプレ文言で画像提出を要求 | **ビルド作り直し不要**(情報要求のため)。デモ設定JSON(`AppConfigJson`)をエンコードしたQR画像を生成(`photouploader-review-demo-qr.png`・スキャン→デコードで元JSONに戻ることを検証済み)し、Resolution Center に添付+英文返信で対応。手順・文面は `notes/review-response-2.1a.md`。デモスタックは削除していないので使い回し可 |
+| 24 | 動画のアップロードだけ「アップロードURLの取得に失敗しました (HTTP 400)」(写真は成功)(2026-09-24 ユーザー報告) | アプリ内のクイック作成リンクが読むS3上の公開テンプレート(`photouploader-templatebuilder/photo-uploader/template.yaml`)が**動画対応前(7月上旬)の版のまま**だった。`publish-template` を7/10の動画対応以降一度も再実行しておらず、そこから作ったスタックのLambdaは画像形式しか受け付けない(動画のcontentTypeを400で拒否)。同じ理由でサムネイル・ゴミ箱削除も未反映。リポジトリ内のテンプレートは最新でCIも緑だったため気づけなかった | `publish-template` を再実行(またはS3コンソールで `template.yaml` を上書き)して公開テンプレートを更新し、既存スタックを「スタックの更新」で反映(ユーザー作業) |
 
 **教訓メモ**
 
@@ -102,6 +103,7 @@
 - **XcodeGenのiOSプリセットは `TARGETED_DEVICE_FAMILY="1,2"` をターゲットに入れる**。iPhone専用にしたいならターゲットレベルで明示上書き(プロジェクトレベル設定は勝てない)
 - **App Store ConnectへのアップロードはiOS 26 SDK(Xcode 26)以降が必須**。macランナーのデフォルトXcodeに依存せず明示選択する
 - **マーケティングバージョンは `MARKETING_VERSION` 設定だけでは反映されない**。XcodeGen生成のInfo.plistは `CFBundleShortVersionString` を "1.0" リテラルで書くため、`info.properties` に `CFBundleShortVersionString: "$(MARKETING_VERSION)"` を明示して紐づける(課題#23)。ビルド番号(`CFBundleVersion`)は apple-generic versioning が `CURRENT_PROJECT_VERSION` から設定するので別扱い
+- **バックエンド(テンプレート)を変えたら、マージ後に必ず `publish-template` を再実行する**。リポジトリとCIが緑でも、利用者がクイック作成リンクで作るスタックはS3上の公開テンプレートで決まる(課題#24)。公開版の確認は `curl <テンプレートURL>` で中身を見るのが早い
 - **秘密鍵・証明書・パスワードはチャットに貼らない**。GitHub Secretsへ直接登録。貼ってしまったら即失効・再発行
 - Mac無しでも配布用証明書は作れる: CSR作成〜.p12化はWindowsのGit Bash(OpenSSL)で完結。ただし.p12は**レガシー形式(SHA1-3DES)**でエクスポートしないとmacOSランナーが読めない(課題#18)
 - CIの署名エラーが続くときは、手動プロビジョニング(p12+.mobileprovisionをSecretsで渡す)への切り替えが確実な逃げ道(下書きはコミット 59b5c73 に保存)
@@ -194,6 +196,7 @@
 ### 撮影月フォルダ分け(2026-09-24)
 
 - [x] **アップロード先を撮影月ごとのフォルダに**(2026-09-24)— バックエンド: presignが `captureMonth` を受け取りキーを `uploads/<sub>/[albums/<アルバム>/]YYYY/MM/UUID` に(日フォルダは廃止)。1900年〜翌年・1〜12月以外や書式不正はアップロード月にフォールバック。pytest 3件追加(計18件)。iOS: 全アップロード経路で撮影月を算出して送信(403再署名リトライ時もメタデータで引き継ぎ)。ユニットテスト2件追加
+- [ ] **公開テンプレートの更新**(あなた)— PR #22 マージ後、`publish-template.ps1 -BucketName photouploader-templatebuilder` を再実行(またはGitHub Pagesの `template-quickcreate.yaml` を `template.yaml` にリネームしてS3コンソールの `photo-uploader/` に上書きアップロード)。**動画の400エラー(課題#24)もこれで解消**。確認: 公開URLの中身に `video/mp4` と `captureMonth` があること
 - [ ] **既存スタックの再デプロイ**(あなた)— バックエンドを更新しないと旧Lambdaが `captureMonth` を無視し、従来どおりアップロード日 `YYYY/MM/DD` に保存される(アプリは新旧どちらのバックエンドでも動作する)。クイック作成スタックは「スタックの更新」で同じテンプレートURLを指定(テンプレートは `publish-template` 再実行で反映)
 - 補足: 既存のオブジェクトは移動しない(ギャラリー表示・削除は新旧キー混在でも動作)。ギャラリーの並びは従来どおりアップロード時刻順
 
